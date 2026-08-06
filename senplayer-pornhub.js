@@ -11,6 +11,27 @@
     }
 
     const headers = Object.assign({}, response.headers || {});
+
+    // Save the browser headers used to obtain the signed media URL. The CDN
+    // request script reuses them because SenPlayer may ignore the Scheme's
+    // `ua` parameter and send its own User-Agent.
+    if (typeof $persistentStore === "object" && $persistentStore) {
+        const requestHeaders = typeof $request === "object" && $request
+            ? ($request.headers || {})
+            : {};
+        const userAgentKey = Object.keys(requestHeaders).find(
+            key => key.toLowerCase() === "user-agent"
+        );
+        const pageUserAgent = userAgentKey ? String(requestHeaders[userAgentKey]) : "";
+        if (pageUserAgent) {
+            $persistentStore.write(pageUserAgent, "senplayer-pornhub-user-agent");
+        }
+        try {
+            const pageUrl = new URL($request.url);
+            $persistentStore.write(pageUrl.origin + "/", "senplayer-pornhub-referer");
+        } catch (_) {}
+    }
+
     const contentTypeKey = Object.keys(headers).find(
         key => key.toLowerCase() === "content-type"
     );

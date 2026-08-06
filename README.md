@@ -40,7 +40,8 @@ https://cn.pornhub.com/view_video.php?viewkey=...
 1. 过滤直接 MP4 地址；
 2. 按清晰度选择最高画质；
 3. 编码视频 URL、标题及当前 User-Agent；
-4. 打开 `senplayer://x-callback-url/play`。
+4. 打开 `senplayer://x-callback-url/play`；
+5. 在 SenPlayer 请求 CDN 时恢复 Safari 的 `User-Agent` 和 Pornhub `Referer`，避免播放器自带请求头触发 CDN 防盗链。
 
 ## 注意事项
 
@@ -53,6 +54,7 @@ https://cn.pornhub.com/view_video.php?viewkey=...
 
 - `senplayer-pornhub.plugin`：Loon 插件配置
 - `senplayer-pornhub.js`：HTML 响应注入与 SenPlayer 跳转脚本
+- `senplayer-pornhub-request.js`：SenPlayer MP4 CDN 请求头修正脚本
 
 ## License
 

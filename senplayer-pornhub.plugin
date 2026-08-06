@@ -5,6 +5,7 @@
 
 [Script]
 http-response ^https:\/\/(?:www|cn)\.pornhub\.com\/view_video\.php(?:\?|$) script-path=https://raw.githubusercontent.com/genanalucy/loon-ph/main/senplayer-pornhub.js, requires-body=true, timeout=10, tag=Pornhub SenPlayer, enable=true
+http-request ^https:\/\/em\.phncdn\.com\/.*\.mp4(?:\?|$) script-path=https://raw.githubusercontent.com/genanalucy/loon-ph/main/senplayer-pornhub-request.js, timeout=10, tag=Pornhub SenPlayer CDN Headers, enable=true
 
 [MITM]
-hostname = %APPEND% www.pornhub.com, cn.pornhub.com
+hostname = %APPEND% www.pornhub.com, cn.pornhub.com, em.phncdn.com
