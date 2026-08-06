@@ -1,0 +1,10 @@
+#!name=P​​ornhub SenPlayer
+#!desc=在 www.pornhub.com 和 cn.pornhub.com 视频页添加 SenPlayer 播放按钮（优先最高画质 MP4）
+#!author=local
+#!system=iOS,iPadOS
+
+[Script]
+http-response ^https:\/\/(?:www|cn)\.pornhub\.com\/view_video\.php(?:\?|$) script-path=https://raw.githubusercontent.com/genanalucy/loon-ph/main/senplayer-pornhub.js, requires-body=true, timeout=10, tag=Pornhub SenPlayer, enable=true
+
+[MITM]
+hostname = %APPEND% www.pornhub.com, cn.pornhub.com
