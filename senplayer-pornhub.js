@@ -171,8 +171,10 @@
 </script>`;
 
     let body = response.body;
-    if (/<\/body\s*>/i.test(body)) {
-        body = body.replace(/<\/body\s*>/i, injected + "</body>");
+    if (/<body(?:\s[^>]*)?>/i.test(body)) {
+        body = body.replace(/<body(?:\s[^>]*)?>/i, match => match + injected);
+    } else if (/<\/html\s*>/i.test(body)) {
+        body = body.replace(/<\/html\s*>/i, injected + "</html>");
     } else {
         body += injected;
     }
@@ -185,6 +187,7 @@
             delete headers[key];
         }
     }
+    headers["X-Loon-SenPlayer"] = "injected";
 
     $done({ response: { status: response.status, headers, body } });
 })();
