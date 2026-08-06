@@ -2,7 +2,7 @@
 
 一个用于 Loon 的 Pornhub → SenPlayer 辅助插件。
 
-它会在 Pornhub 视频详情页右下角添加“SenPlayer 播放”按钮，提取可用的最高画质 MP4，并通过 SenPlayer URL Scheme 打开。
+它会在 Pornhub 视频详情页右下角添加“SenPlayer 播放”按钮，提取可用的最高画质 MP4，通过 SenPlayer URL Scheme 打开，并将该条目保存到 SenPlayer 的 URL 列表/历史记录。
 
 ## 支持域名
 
@@ -40,12 +40,13 @@ https://cn.pornhub.com/view_video.php?viewkey=...
 1. 过滤直接 MP4 地址；
 2. 按清晰度选择最高画质；
 3. 编码视频 URL、标题及当前 User-Agent；
-4. 打开 `senplayer://x-callback-url/play`；
+4. 使用 `senplayer://x-callback-url/play?...&saveURL` 播放，并保存到 SenPlayer URL 列表/历史记录；
 5. 在 SenPlayer 请求 CDN 时恢复 Safari 的 `User-Agent` 和 Pornhub `Referer`，避免播放器自带请求头触发 CDN 防盗链。
 
 ## 注意事项
 
 - Pornhub 媒体地址通常包含有效期、签名和出口 IP；获取链接后不要切换代理节点。
+- 保存到 SenPlayer 的历史条目仍使用临时签名地址；地址过期后需返回 Pornhub 页面重新取链。
 - Pornhub 页面和 `*.phncdn.com` 建议使用相同代理策略。
 - 网站页面结构变化后可能需要更新提取逻辑。
 - 本项目不存储、代理或分发视频内容。

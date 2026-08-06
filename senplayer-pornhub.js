@@ -179,7 +179,10 @@
                 name: getTitle(getFlashvars()),
                 ua: navigator.userAgent
             });
-            window.location.href = "senplayer://x-callback-url/play?" + params.toString();
+            // SenPlayer defines saveURL as a flag without a value. It plays the
+            // media and also stores the entry in its URL list/history.
+            window.location.href = "senplayer://x-callback-url/play?" +
+                params.toString() + "&saveURL";
             notify(media.quality ? "打开 " + media.quality + "P" : "正在打开…");
         } catch (error) {
             console.error("[SenPlayer]", error);
