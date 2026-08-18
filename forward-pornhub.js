@@ -7,6 +7,15 @@ WidgetMetadata = {
     author: "genanalucy",
     site: "https://www.pornhub.com/",
     detailCacheDuration: 0,
+    globalParams: [
+        {
+            name: "favoriteCreators",
+            title: "收藏创作者",
+            type: "input",
+            description: "每行一个 Pornhub 创作者主页 URL 或 /model、/pornstar、/channels、/users 路径",
+            value: "/model/milamuse\n/model/kitty-alina\n/model/yunadoll\n/model/minialejandra\n/model/nath-gomez7\n/model/arinafox\n/model/lesya-moon\n/model/catawaiss\n/model/pufffypink\n/model/kuporovaa-krupa\n/pornstar/meg-vicious\n/model/diana-rider"
+        }
+    ],
     modules: [
         {
             id: "loadList",
@@ -14,6 +23,20 @@ WidgetMetadata = {
             functionName: "loadList",
             cacheDuration: 300,
             params: [{ name: "page", title: "页码", type: "page" }]
+        },
+        {
+            id: "loadFavorites",
+            title: "收藏演员",
+            functionName: "loadFavorites",
+            cacheDuration: 300,
+            params: []
+        },
+        {
+            id: "loadFavoriteUpdates",
+            title: "收藏更新",
+            functionName: "loadFavoriteUpdates",
+            cacheDuration: 300,
+            params: []
         },
         {
             id: "loadResource",
@@ -71,6 +94,37 @@ function linkForVideo(key) {
 
 function linkForCreator(path) {
     return "creator:" + path.replace(/^https?:\/\/[^/]+/i, "").replace(/^\/+/, "");
+}
+
+function favoriteCreatorPaths(value) {
+    const entries = String(value || "").split(/[\n,]+/);
+    const paths = [];
+    const seen = {};
+    for (const entry of entries) {
+        const path = entry.trim().replace(/^https?:\/\/[^/]+/i, "").replace(/^\/+/, "").replace(/[?#].*$/, "");
+        if (!/^(?:model|pornstar|channels|users)\/[A-Za-z0-9_-]+$/i.test(path) || seen[path.toLowerCase()]) continue;
+        seen[path.toLowerCase()] = true;
+        paths.push(path);
+    }
+    return paths;
+}
+
+function creatorTitleFromPath(path) {
+    return path.split("/").slice(1).join("/").replace(/[-_]+/g, " ").replace(/\b\w/g, char => char.toUpperCase());
+}
+
+function creatorItem(path, html) {
+    const titleMatch = String(html || "").match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i) ||
+        String(html || "").match(/<title[^>]*>\s*([^<|]+?)(?:\s*[|-]|<)/i);
+    const imageMatch = String(html || "").match(/<(?:img)\b[^>]*(?:data-avatar|src)\s*=\s*["']([^"']+)["'][^>]*(?:class\s*=\s*["'][^"']*(?:avatar|profile)[^"']*["'])?/i);
+    return {
+        id: linkForCreator(path),
+        type: "url",
+        title: cleanText(titleMatch && titleMatch[1]) || creatorTitleFromPath(path),
+        coverUrl: absoluteUrl(imageMatch && imageMatch[1]),
+        description: "已收藏创作者",
+        link: linkForCreator(path)
+    };
 }
 
 function videoItemFromCard(card) {
@@ -202,6 +256,46 @@ async function loadList(params = {}) {
     const items = parseVideoCards(html);
     if (!items.length) throw new Error("首页未找到视频；站点页面结构可能已变化");
     return items;
+}
+
+async function loadFavorites(params = {}) {
+    const paths = favoriteCreatorPaths(params.favoriteCreators);
+    if (!paths.length) throw new Error("请在“收藏创作者”中填写至少一个有效主页路径");
+    const results = [];
+    for (const path of paths) {
+        try {
+            const html = await requestPage("/" + path, {});
+            results.push(creatorItem(path, html));
+        } catch (error) {
+            console.warn("[Pornhub] 读取收藏创作者失败:", path, error && error.message ? error.message : error);
+            results.push(creatorItem(path, ""));
+        }
+    }
+    return results;
+}
+
+async function loadFavoriteUpdates(params = {}) {
+    const paths = favoriteCreatorPaths(params.favoriteCreators);
+    if (!paths.length) throw new Error("请在“收藏创作者”中填写至少一个有效主页路径");
+    const results = [];
+    const seen = {};
+    for (const path of paths) {
+        try {
+            const html = await requestPage("/" + path, {});
+            const creator = creatorItem(path, html);
+            const items = parseVideoCards(html);
+            for (const item of items) {
+                if (seen[item.id]) continue;
+                seen[item.id] = true;
+                item.peoples = [{ id: linkForCreator(path), title: creator.title, role: "创作者" }];
+                results.push(item);
+            }
+        } catch (error) {
+            console.warn("[Pornhub] 读取收藏更新失败:", path, error && error.message ? error.message : error);
+        }
+    }
+    if (!results.length) throw new Error("未找到收藏创作者的公开作品");
+    return results;
 }
 
 async function search(params = {}) {

@@ -64,6 +64,15 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
 
   const creatorWorks = await sandbox.loadList({ peopleId: "creator:pornstar/alice" });
   assert.equal(creatorWorks[0].link, "video:abc123");
+
+  const favorites = await sandbox.loadFavorites({ favoriteCreators: "https://www.pornhub.com/pornstar/alice\n/model/bob\ninvalid" });
+  assert.equal(favorites.length, 2);
+  assert.equal(favorites[0].link, "creator:pornstar/alice");
+  assert.equal(favorites[1].link, "creator:model/bob");
+
+  const updates = await sandbox.loadFavoriteUpdates({ favoriteCreators: "/pornstar/alice\n/model/bob" });
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0].peoples[0].id, "creator:pornstar/alice");
   assert.ok(calls.some(call => call.url.endsWith("/pornstar/alice")));
   assert.ok(calls.some(call => call.url.endsWith("/view_video.php") && call.options.params.viewkey === "abc123"));
   console.log("✅ Forward Pornhub mock test passed", { calls: calls.length });
