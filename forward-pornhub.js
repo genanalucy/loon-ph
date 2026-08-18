@@ -113,6 +113,20 @@ function creatorTitleFromPath(path) {
     return path.split("/").slice(1).join("/").replace(/[-_]+/g, " ").replace(/\b\w/g, char => char.toUpperCase());
 }
 
+function creatorCacheKey(path) {
+    return "creator-page:" + path.toLowerCase();
+}
+
+function readCreatorCache(path) {
+    if (!Widget.storage || typeof Widget.storage.get !== "function") return "";
+    return String(Widget.storage.get(creatorCacheKey(path)) || "");
+}
+
+function writeCreatorCache(path, html) {
+    if (!Widget.storage || typeof Widget.storage.set !== "function" || !html) return;
+    Widget.storage.set(creatorCacheKey(path), html);
+}
+
 function creatorItem(path, html) {
     const titleMatch = String(html || "").match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i) ||
         String(html || "").match(/<title[^>]*>\s*([^<|]+?)(?:\s*[|-]|<)/i);
@@ -266,6 +280,7 @@ async function loadFavorites(params = {}) {
     for (const path of paths) {
         try {
             const html = await requestPage("/" + path, {});
+            writeCreatorCache(path, html);
             results.push(creatorItem(path, html));
         } catch (error) {
             console.warn("[Pornhub] 读取收藏创作者失败:", path, error && error.message ? error.message : error);
@@ -283,6 +298,7 @@ async function loadFavoriteUpdates(params = {}) {
     for (const path of paths) {
         try {
             const html = await requestPage("/" + path, {});
+            writeCreatorCache(path, html);
             const creator = creatorItem(path, html);
             const items = parseVideoCards(html);
             for (const item of items) {
@@ -311,7 +327,11 @@ async function loadDetail(link) {
     if (value.indexOf("creator:") === 0) {
         const path = value.slice("creator:".length).replace(/^\/+/, "");
         if (!/^(?:model|pornstar|channels|users)\/[A-Za-z0-9_-]+$/i.test(path)) return null;
-        const html = await requestPage("/" + path, {});
+        let html = readCreatorCache(path);
+        if (!html) {
+            html = await requestPage("/" + path, {});
+            writeCreatorCache(path, html);
+        }
         const creator = creatorItem(path, html);
         return Object.assign(creator, {
             relatedItems: parseVideoCards(html).map(item => {

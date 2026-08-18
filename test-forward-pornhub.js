@@ -27,6 +27,7 @@ const calls = [];
 const sandbox = {
   console,
   Widget: {
+    storage: { _data: {}, get(key) { return this._data[key]; }, set(key, value) { this._data[key] = value; } },
     http: {
       get: async (url, options) => {
         calls.push({ url, options });
@@ -69,6 +70,12 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
   assert.equal(creatorDetail.link, "creator:pornstar/alice");
   assert.equal(creatorDetail.relatedItems.length, 1);
   assert.equal(creatorDetail.relatedItems[0].link, "video:abc123");
+
+  sandbox.Widget.storage.set("creator-page:model/creator-cache", homeCard);
+  const callsBeforeCachedDetail = calls.length;
+  const cachedCreatorDetail = await sandbox.loadDetail("creator:model/creator-cache");
+  assert.equal(cachedCreatorDetail.relatedItems[0].link, "video:abc123");
+  assert.equal(calls.length, callsBeforeCachedDetail);
 
   const favorites = await sandbox.loadFavorites({ favoriteCreators: "https://www.pornhub.com/pornstar/alice\n/model/bob\ninvalid" });
   assert.equal(favorites.length, 2);
