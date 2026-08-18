@@ -116,7 +116,8 @@ function creatorTitleFromPath(path) {
 function creatorItem(path, html) {
     const titleMatch = String(html || "").match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i) ||
         String(html || "").match(/<title[^>]*>\s*([^<|]+?)(?:\s*[|-]|<)/i);
-    const imageMatch = String(html || "").match(/<(?:img)\b[^>]*(?:data-avatar|src)\s*=\s*["']([^"']+)["'][^>]*(?:class\s*=\s*["'][^"']*(?:avatar|profile)[^"']*["'])?/i);
+    const imageMatch = String(html || "").match(/<meta\b[^>]*property\s*=\s*["']og:image["'][^>]*content\s*=\s*["']([^"']+)/i) ||
+        String(html || "").match(/<(?:img)\b[^>]*(?:data-avatar|src)\s*=\s*["']([^"']+)["'][^>]*(?:class\s*=\s*["'][^"']*(?:avatar|profile)[^"']*["'])?/i);
     return {
         id: linkForCreator(path),
         type: "url",
@@ -307,6 +308,18 @@ async function search(params = {}) {
 
 async function loadDetail(link) {
     const value = String(link || "");
+    if (value.indexOf("creator:") === 0) {
+        const path = value.slice("creator:".length).replace(/^\/+/, "");
+        if (!/^(?:model|pornstar|channels|users)\/[A-Za-z0-9_-]+$/i.test(path)) return null;
+        const html = await requestPage("/" + path, {});
+        const creator = creatorItem(path, html);
+        return Object.assign(creator, {
+            relatedItems: parseVideoCards(html).map(item => {
+                item.peoples = [{ id: linkForCreator(path), title: creator.title, role: "创作者" }];
+                return item;
+            })
+        });
+    }
     if (value.indexOf("video:") !== 0) return null;
     const key = value.slice("video:".length);
     if (!/^[A-Za-z0-9]+$/.test(key)) return null;

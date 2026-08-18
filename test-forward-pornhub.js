@@ -65,6 +65,11 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
   const creatorWorks = await sandbox.loadList({ peopleId: "creator:pornstar/alice" });
   assert.equal(creatorWorks[0].link, "video:abc123");
 
+  const creatorDetail = await sandbox.loadDetail("creator:pornstar/alice");
+  assert.equal(creatorDetail.link, "creator:pornstar/alice");
+  assert.equal(creatorDetail.relatedItems.length, 1);
+  assert.equal(creatorDetail.relatedItems[0].link, "video:abc123");
+
   const favorites = await sandbox.loadFavorites({ favoriteCreators: "https://www.pornhub.com/pornstar/alice\n/model/bob\ninvalid" });
   assert.equal(favorites.length, 2);
   assert.equal(favorites[0].link, "creator:pornstar/alice");
