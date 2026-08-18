@@ -1,7 +1,7 @@
 WidgetMetadata = {
     id: "forward.pornhub",
     title: "Pornhub",
-    version: "1.1.1",
+    version: "1.1.2",
     requiredVersion: "0.0.1",
     description: "Pornhub 公开热门、搜索、播放、相关推荐与创作者作品",
     author: "genanalucy",
@@ -42,7 +42,7 @@ WidgetMetadata = {
             id: "loadCreatorWall",
             title: "演员作品墙",
             functionName: "loadCreatorWall",
-            cacheDuration: 300,
+            cacheDuration: 0,
             params: [{
                 name: "creatorPath",
                 title: "演员",
@@ -61,6 +61,15 @@ WidgetMetadata = {
                     { title: "Kuporovaa Krupa", value: "/model/kuporovaa-krupa" },
                     { title: "Meg Vicious", value: "/pornstar/meg-vicious" },
                     { title: "Diana Rider", value: "/model/diana-rider" }
+                ]
+            }, {
+                name: "sortOrder",
+                title: "排序",
+                type: "enumeration",
+                value: "latest",
+                enumOptions: [
+                    { title: "最新发布", value: "latest" },
+                    { title: "随机排列", value: "random" }
                 ]
             }]
         },
@@ -326,10 +335,19 @@ async function loadCreatorWall(params = {}) {
     const creator = creatorItem(path, html);
     const items = parseVideoCards(html);
     if (!items.length) throw new Error("未找到该创作者的公开作品");
-    return items.map(item => {
+    const works = items.map(item => {
         item.peoples = [{ id: linkForCreator(path), title: creator.title, role: "创作者" }];
         return item;
     });
+    if (params.sortOrder === "random") {
+        for (let index = works.length - 1; index > 0; index -= 1) {
+            const swapIndex = Math.floor(Math.random() * (index + 1));
+            const temporary = works[index];
+            works[index] = works[swapIndex];
+            works[swapIndex] = temporary;
+        }
+    }
+    return works;
 }
 
 async function loadFavoriteUpdates(params = {}) {

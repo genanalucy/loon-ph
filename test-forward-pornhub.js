@@ -82,11 +82,14 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
   assert.equal(favorites[0].link, "creator:pornstar/alice");
   assert.equal(favorites[1].link, "creator:model/bob");
 
-  assert.equal(sandbox.WidgetMetadata.version, "1.1.1");
+  assert.equal(sandbox.WidgetMetadata.version, "1.1.2");
   const creatorWallModule = sandbox.WidgetMetadata.modules.find(module => module.id === "loadCreatorWall");
   assert.equal(sandbox.WidgetMetadata.modules.length, 5);
+  assert.equal(creatorWallModule.cacheDuration, 0);
   assert.equal(creatorWallModule.params[0].type, "enumeration");
   assert.equal(creatorWallModule.params[0].enumOptions.length, 12);
+  assert.equal(creatorWallModule.params[1].name, "sortOrder");
+  assert.equal(creatorWallModule.params[1].enumOptions[1].value, "random");
 
   const creatorWall = await sandbox.loadCreatorWall({ creatorPath: "/pornstar/alice" });
   assert.equal(creatorWall.length, 1);
