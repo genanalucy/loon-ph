@@ -1,7 +1,7 @@
 WidgetMetadata = {
     id: "forward.pornhub",
     title: "Pornhub",
-    version: "1.1.0",
+    version: "1.1.1",
     requiredVersion: "0.0.1",
     description: "Pornhub 公开热门、搜索、播放、相关推荐与创作者作品",
     author: "genanalucy",
@@ -39,88 +39,30 @@ WidgetMetadata = {
             params: []
         },
         {
-            id: "creatorMilaMuse",
-            title: "MilaMuse · 作品",
+            id: "loadCreatorWall",
+            title: "演员作品墙",
             functionName: "loadCreatorWall",
             cacheDuration: 300,
-            params: [{ name: "creatorPath", type: "constant", value: "/model/milamuse" }]
-        },
-        {
-            id: "creatorKittyAlina",
-            title: "Kitty Alina · 作品",
-            functionName: "loadCreatorWall",
-            cacheDuration: 300,
-            params: [{ name: "creatorPath", type: "constant", value: "/model/kitty-alina" }]
-        },
-        {
-            id: "creatorYunadoll",
-            title: "Yunadoll · 作品",
-            functionName: "loadCreatorWall",
-            cacheDuration: 300,
-            params: [{ name: "creatorPath", type: "constant", value: "/model/yunadoll" }]
-        },
-        {
-            id: "creatorMiniAlejandra",
-            title: "MiniAlejandra · 作品",
-            functionName: "loadCreatorWall",
-            cacheDuration: 300,
-            params: [{ name: "creatorPath", type: "constant", value: "/model/minialejandra" }]
-        },
-        {
-            id: "creatorNathGomez7",
-            title: "Nath Gomez7 · 作品",
-            functionName: "loadCreatorWall",
-            cacheDuration: 300,
-            params: [{ name: "creatorPath", type: "constant", value: "/model/nath-gomez7" }]
-        },
-        {
-            id: "creatorArinaFox",
-            title: "ArinaFox · 作品",
-            functionName: "loadCreatorWall",
-            cacheDuration: 300,
-            params: [{ name: "creatorPath", type: "constant", value: "/model/arinafox" }]
-        },
-        {
-            id: "creatorLesyaMoon",
-            title: "Lesya Moon · 作品",
-            functionName: "loadCreatorWall",
-            cacheDuration: 300,
-            params: [{ name: "creatorPath", type: "constant", value: "/model/lesya-moon" }]
-        },
-        {
-            id: "creatorCatawaiss",
-            title: "Catawaiss · 作品",
-            functionName: "loadCreatorWall",
-            cacheDuration: 300,
-            params: [{ name: "creatorPath", type: "constant", value: "/model/catawaiss" }]
-        },
-        {
-            id: "creatorPufffypink",
-            title: "Pufffypink · 作品",
-            functionName: "loadCreatorWall",
-            cacheDuration: 300,
-            params: [{ name: "creatorPath", type: "constant", value: "/model/pufffypink" }]
-        },
-        {
-            id: "creatorKuporovaaKrupa",
-            title: "Kuporovaa Krupa · 作品",
-            functionName: "loadCreatorWall",
-            cacheDuration: 300,
-            params: [{ name: "creatorPath", type: "constant", value: "/model/kuporovaa-krupa" }]
-        },
-        {
-            id: "creatorMegVicious",
-            title: "Meg Vicious · 作品",
-            functionName: "loadCreatorWall",
-            cacheDuration: 300,
-            params: [{ name: "creatorPath", type: "constant", value: "/pornstar/meg-vicious" }]
-        },
-        {
-            id: "creatorDianaRider",
-            title: "Diana Rider · 作品",
-            functionName: "loadCreatorWall",
-            cacheDuration: 300,
-            params: [{ name: "creatorPath", type: "constant", value: "/model/diana-rider" }]
+            params: [{
+                name: "creatorPath",
+                title: "演员",
+                type: "enumeration",
+                value: "/model/milamuse",
+                enumOptions: [
+                    { title: "MilaMuse", value: "/model/milamuse" },
+                    { title: "Kitty Alina", value: "/model/kitty-alina" },
+                    { title: "Yunadoll", value: "/model/yunadoll" },
+                    { title: "MiniAlejandra", value: "/model/minialejandra" },
+                    { title: "Nath Gomez7", value: "/model/nath-gomez7" },
+                    { title: "ArinaFox", value: "/model/arinafox" },
+                    { title: "Lesya Moon", value: "/model/lesya-moon" },
+                    { title: "Catawaiss", value: "/model/catawaiss" },
+                    { title: "Pufffypink", value: "/model/pufffypink" },
+                    { title: "Kuporovaa Krupa", value: "/model/kuporovaa-krupa" },
+                    { title: "Meg Vicious", value: "/pornstar/meg-vicious" },
+                    { title: "Diana Rider", value: "/model/diana-rider" }
+                ]
+            }]
         },
         {
             id: "loadResource",
