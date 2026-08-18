@@ -1,7 +1,7 @@
 WidgetMetadata = {
     id: "forward.pornhub",
     title: "Pornhub",
-    version: "1.0.0",
+    version: "1.1.0",
     requiredVersion: "0.0.1",
     description: "Pornhub 公开热门、搜索、播放、相关推荐与创作者作品",
     author: "genanalucy",
@@ -37,6 +37,90 @@ WidgetMetadata = {
             functionName: "loadFavoriteUpdates",
             cacheDuration: 300,
             params: []
+        },
+        {
+            id: "creatorMilaMuse",
+            title: "MilaMuse · 作品",
+            functionName: "loadCreatorWall",
+            cacheDuration: 300,
+            params: [{ name: "creatorPath", type: "constant", value: "/model/milamuse" }]
+        },
+        {
+            id: "creatorKittyAlina",
+            title: "Kitty Alina · 作品",
+            functionName: "loadCreatorWall",
+            cacheDuration: 300,
+            params: [{ name: "creatorPath", type: "constant", value: "/model/kitty-alina" }]
+        },
+        {
+            id: "creatorYunadoll",
+            title: "Yunadoll · 作品",
+            functionName: "loadCreatorWall",
+            cacheDuration: 300,
+            params: [{ name: "creatorPath", type: "constant", value: "/model/yunadoll" }]
+        },
+        {
+            id: "creatorMiniAlejandra",
+            title: "MiniAlejandra · 作品",
+            functionName: "loadCreatorWall",
+            cacheDuration: 300,
+            params: [{ name: "creatorPath", type: "constant", value: "/model/minialejandra" }]
+        },
+        {
+            id: "creatorNathGomez7",
+            title: "Nath Gomez7 · 作品",
+            functionName: "loadCreatorWall",
+            cacheDuration: 300,
+            params: [{ name: "creatorPath", type: "constant", value: "/model/nath-gomez7" }]
+        },
+        {
+            id: "creatorArinaFox",
+            title: "ArinaFox · 作品",
+            functionName: "loadCreatorWall",
+            cacheDuration: 300,
+            params: [{ name: "creatorPath", type: "constant", value: "/model/arinafox" }]
+        },
+        {
+            id: "creatorLesyaMoon",
+            title: "Lesya Moon · 作品",
+            functionName: "loadCreatorWall",
+            cacheDuration: 300,
+            params: [{ name: "creatorPath", type: "constant", value: "/model/lesya-moon" }]
+        },
+        {
+            id: "creatorCatawaiss",
+            title: "Catawaiss · 作品",
+            functionName: "loadCreatorWall",
+            cacheDuration: 300,
+            params: [{ name: "creatorPath", type: "constant", value: "/model/catawaiss" }]
+        },
+        {
+            id: "creatorPufffypink",
+            title: "Pufffypink · 作品",
+            functionName: "loadCreatorWall",
+            cacheDuration: 300,
+            params: [{ name: "creatorPath", type: "constant", value: "/model/pufffypink" }]
+        },
+        {
+            id: "creatorKuporovaaKrupa",
+            title: "Kuporovaa Krupa · 作品",
+            functionName: "loadCreatorWall",
+            cacheDuration: 300,
+            params: [{ name: "creatorPath", type: "constant", value: "/model/kuporovaa-krupa" }]
+        },
+        {
+            id: "creatorMegVicious",
+            title: "Meg Vicious · 作品",
+            functionName: "loadCreatorWall",
+            cacheDuration: 300,
+            params: [{ name: "creatorPath", type: "constant", value: "/pornstar/meg-vicious" }]
+        },
+        {
+            id: "creatorDianaRider",
+            title: "Diana Rider · 作品",
+            functionName: "loadCreatorWall",
+            cacheDuration: 300,
+            params: [{ name: "creatorPath", type: "constant", value: "/model/diana-rider" }]
         },
         {
             id: "loadResource",
@@ -288,6 +372,22 @@ async function loadFavorites(params = {}) {
         }
     }
     return results;
+}
+
+async function loadCreatorWall(params = {}) {
+    const path = String(params.creatorPath || "").replace(/^https?:\/\/[^/]+/i, "").replace(/^\/+/, "");
+    if (!/^(?:model|pornstar|channels|users)\/[A-Za-z0-9_-]+$/i.test(path)) {
+        throw new Error("缺少有效的创作者主页路径");
+    }
+    const html = await requestPage("/" + path, {});
+    writeCreatorCache(path, html);
+    const creator = creatorItem(path, html);
+    const items = parseVideoCards(html);
+    if (!items.length) throw new Error("未找到该创作者的公开作品");
+    return items.map(item => {
+        item.peoples = [{ id: linkForCreator(path), title: creator.title, role: "创作者" }];
+        return item;
+    });
 }
 
 async function loadFavoriteUpdates(params = {}) {
