@@ -242,22 +242,51 @@ async function loadDetail(link) {
     };
 }
 
+async function resolveRemoteDefinitions(definitions) {
+    const remote = definitions.find(item => item && item.remote && /^https?:\/\//i.test(item.videoUrl || ""));
+    if (!remote) return [];
+    try {
+        const response = await Widget.http.get(remote.videoUrl, {
+            headers: Object.assign(phHeaders(), { Accept: "application/json, text/plain, */*" })
+        });
+        const data = typeof response.data === "string" ? JSON.parse(response.data) : response.data;
+        return Array.isArray(data) ? data.filter(item => item && /^https?:\/\//i.test(item.videoUrl || "")) : [];
+    } catch (error) {
+        console.warn("[Pornhub] MP4 线路解析失败，使用 HLS 线路:", error && error.message ? error.message : error);
+        return [];
+    }
+}
+
 async function loadResource(params = {}) {
     const link = String(params.link || "");
     const key = link.indexOf("video:") === 0 ? link.slice("video:".length) : "";
     if (!/^[A-Za-z0-9]+$/.test(key)) throw new Error("缺少有效的视频标识");
     const html = await requestPage("/view_video.php", { viewkey: key });
     const flashvars = extractFlashvars(html);
-    const definitions = flashvars && Array.isArray(flashvars.mediaDefinitions) ? flashvars.mediaDefinitions : [];
+    const pageDefinitions = flashvars && Array.isArray(flashvars.mediaDefinitions) ? flashvars.mediaDefinitions : [];
+    const resolvedDefinitions = await resolveRemoteDefinitions(pageDefinitions);
+    const definitions = pageDefinitions.filter(item => !item.remote).concat(resolvedDefinitions);
+    const seen = {};
     const resources = definitions.filter(item => item && /^https?:\/\//i.test(item.videoUrl || ""))
-        .sort((a, b) => Number(b.height || b.quality || 0) - Number(a.height || a.quality || 0))
-        .map(item => ({
-            name: (item.quality || item.height || "自动") + "P",
-            description: String(item.format || "HLS").toUpperCase(),
-            url: item.videoUrl,
-            customHeaders: phHeaders(),
-            playerType: "app"
-        }));
+        .sort((a, b) => {
+            const quality = Number(b.height || b.quality || 0) - Number(a.height || a.quality || 0);
+            if (quality) return quality;
+            return String(a.format || "").toLowerCase() === "mp4" ? -1 : 1;
+        })
+        .map(item => {
+            const format = String(item.format || "hls").toUpperCase();
+            const quality = Number(item.height || item.quality || 0);
+            const name = format + (quality ? " · " + quality + "P" : " · 自动");
+            if (seen[item.videoUrl]) return null;
+            seen[item.videoUrl] = true;
+            return {
+                name,
+                description: format === "MP4" ? "直连（优先）" : "HLS 自适应分片",
+                url: item.videoUrl,
+                customHeaders: phHeaders(),
+                playerType: "app"
+            };
+        }).filter(Boolean);
     if (!resources.length) throw new Error("未找到可播放的公开资源");
     return resources;
 }

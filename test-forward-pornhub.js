@@ -19,7 +19,7 @@ const relatedRows = [[
 
 const detail = `
 <script>var VIDEO_SHOW = {"videoTitle":"Example Video","videoImage":"https://img.example/detail.jpg"};</script>
-<script>var flashvars_1 = {"video_duration":754,"mediaDefinitions":[{"quality":"720","height":720,"format":"hls","videoUrl":"https://media.example/720.m3u8"},{"quality":"1080","height":1080,"format":"hls","videoUrl":"https://media.example/1080.m3u8"}]};</script>
+<script>var flashvars_1 = {"video_duration":754,"mediaDefinitions":[{"quality":"720","height":720,"format":"hls","videoUrl":"https://media.example/720.m3u8"},{"quality":"1080","height":1080,"format":"hls","videoUrl":"https://media.example/1080.m3u8"},{"format":"mp4","remote":true,"videoUrl":"https://www.pornhub.com/video/get_media?token=example"}]};</script>
 <script>var MODEL_PROFILE = {"username":"Alice","modelProfileLink":"/pornstar/alice"};</script>
 <script>var relatedVideosData = ${JSON.stringify(relatedRows)}; var x = 1;</script>`;
 
@@ -31,6 +31,7 @@ const sandbox = {
       get: async (url, options) => {
         calls.push({ url, options });
         if (url.endsWith("/view_video.php")) return { data: detail };
+        if (url.includes("/video/get_media")) return { data: [{ quality: "1080", height: 1080, format: "mp4", videoUrl: "https://cdn.example/1080.mp4" }] };
         if (url.endsWith("/pornstar/alice")) return { data: homeCard };
         return { data: homeCard };
       }
@@ -56,8 +57,10 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
   assert.equal(detailItem.relatedItems[0].coverUrl, "https://img.example/related-hd.jpg");
 
   const resources = await sandbox.loadResource({ link: "video:abc123" });
-  assert.equal(resources[0].url, "https://media.example/1080.m3u8");
+  assert.equal(resources[0].url, "https://cdn.example/1080.mp4");
+  assert.equal(resources[0].name, "MP4 · 1080P");
   assert.equal(resources[0].customHeaders.Referer, "https://www.pornhub.com/");
+  assert.ok(resources.some(resource => resource.url === "https://media.example/1080.m3u8"));
 
   const creatorWorks = await sandbox.loadList({ peopleId: "creator:pornstar/alice" });
   assert.equal(creatorWorks[0].link, "video:abc123");
