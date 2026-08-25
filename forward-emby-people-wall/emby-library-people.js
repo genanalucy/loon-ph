@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "local.emby.library.people",
   title: "Emby 影片 · 演员筛选（实验）",
-  version: "0.1.0",
+  version: "0.1.1",
   requiredVersion: "0.0.1",
   description: "从影片详情的“团队”点击演员后，尝试在同一模块显示该演员的本地作品。",
   author: "Local",
@@ -39,8 +39,18 @@ function getConfig(params) {
   return saved;
 }
 
+function normalizeParams(params) {
+  const result = {};
+  Object.keys(params || {}).forEach((key) => {
+    const value = params[key];
+    // Forward 的 HTTP 桥会将 JS boolean 编码成 1/0；Emby 4.9.5 只接受 true/false 文本。
+    result[key] = typeof value === "boolean" ? (value ? "true" : "false") : value;
+  });
+  return result;
+}
+
 async function embyGet(config, path, params) {
-  const response = await Widget.http.get(config.server + path, { params: Object.assign({}, params || {}, { api_key: config.apiKey }) });
+  const response = await Widget.http.get(config.server + path, { params: normalizeParams(Object.assign({}, params || {}, { api_key: config.apiKey })) });
   if (!response || !response.data) throw new Error("Emby 返回为空");
   return response.data;
 }
