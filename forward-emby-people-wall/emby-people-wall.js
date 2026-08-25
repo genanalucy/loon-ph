@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "local.emby.peoplewall",
   title: "Emby 演员墙",
-  version: "1.0.2",
+  version: "1.0.3",
   requiredVersion: "0.0.1",
   description: "浏览 Emby 演员头像墙、搜索演员及按演员查看本地影片。",
   author: "Local",
@@ -223,7 +223,15 @@ async function fetchWorksByPerson(config, actorName, personId, sortValue, pageVa
   };
   if (personId) request.PersonIds = personId;
   else request.Person = actorName;
-  const data = await embyGet(config, "/Users/" + encodeURIComponent(config.userId) + "/Items", request);
+  // /Users/{id}/Items 在部分 Emby 4.9.x + Forward 请求组合下会偶发 500；
+  // /Items 是同一查询的兼容端点，显式携带 UserId 后可避免该服务器缺陷。
+  let data;
+  try {
+    data = await embyGet(config, "/Items", request);
+  } catch (error) {
+    console.warn("[/Items] 查询作品失败，回退到用户媒体接口：", error.message || error);
+    data = await embyGet(config, "/Users/" + encodeURIComponent(config.userId) + "/Items", request);
+  }
   return (data.Items || []).map((item) => mediaItem(config, item));
 }
 

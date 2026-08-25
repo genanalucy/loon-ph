@@ -24,7 +24,7 @@ global.Widget = {
           People: [{ Id: "p1", Name: "周星驰", Type: "Actor", Role: "主演" }]
         } };
       }
-      if (url.endsWith("/Users/u1/Items")) {
+      if (url.endsWith("/Users/u1/Items") || url.endsWith("/Items")) {
         if (!p.PersonIds) {
           return { data: { Items: [{
             Id: "i1", Name: "功夫", People: [{ Id: "p1", Name: "周星驰", Type: "Actor" }]
@@ -57,7 +57,7 @@ eval(fs.readFileSync("./emby-people-wall.js", "utf8"));
   assert.equal(person.relatedItems[0].title, "功夫");
   assert.equal(person.relatedItems[0].mediaType, "movie");
   assert.equal(person.episodeItems[0].title, "功夫");
-  const worksCall = calls.find((call) => call.url.endsWith("/Users/u1/Items"));
+  const worksCall = calls.find((call) => call.url.endsWith("/Items") && call.params.PersonIds);
   assert.ok(worksCall);
   assert.equal(worksCall.params.PersonIds, "p1");
   assert.equal(worksCall.params.SortBy, "CommunityRating");
