@@ -55,9 +55,14 @@ async function embyGet(config, path, params) {
   return response.data;
 }
 
+function queryString(params) {
+  return Object.keys(params).map((key) => encodeURIComponent(key) + "=" + encodeURIComponent(String(params[key]))).join("&");
+}
+
 async function embyPost(config, path, params) {
   const query = normalizeParams(Object.assign({}, params || {}, { api_key: config.apiKey }));
-  const response = await Widget.http.post(config.server + path, null, { params: query });
+  // Widget.http.post 未定义 params 选项，因此把 PlaybackInfo 参数显式写入 URL 查询串。
+  const response = await Widget.http.post(config.server + path + "?" + queryString(query), null, {});
   if (!response || !response.data) throw new Error("Emby 播放协商返回为空");
   return response.data;
 }
