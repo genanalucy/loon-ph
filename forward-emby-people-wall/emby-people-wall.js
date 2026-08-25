@@ -139,16 +139,56 @@ function mediaItem(config, item) {
   };
 }
 
+function sortPeople(people, sortValue) {
+  const result = people.slice();
+  if (sortValue === "random") return result.sort(() => Math.random() - 0.5);
+  const direction = sortValue === "nameDesc" ? -1 : 1;
+  return result.sort((left, right) => String(left.Name || "").localeCompare(String(right.Name || "")) * direction);
+}
+
+// 部分 Emby 4.9.x 服务在 /Persons 端点上会返回 500；此回退路径只依赖稳定的 Items 接口。
+async function getPeopleFromLibrary(config) {
+  const data = await embyGet(config, "/Users/" + encodeURIComponent(config.userId) + "/Items", {
+    UserId: config.userId, IncludeItemTypes: "Movie,Series", Recursive: true,
+    StartIndex: 0, Limit: 10000, Fields: "People", EnableImages: false
+  });
+  const peopleById = {};
+  (data.Items || []).forEach((item) => {
+    (item.People || []).forEach((person) => {
+      if (person.Type !== "Actor" || !person.Id || peopleById[person.Id]) return;
+      peopleById[person.Id] = { Id: person.Id, Name: person.Name || "未命名演员" };
+    });
+  });
+  return Object.keys(peopleById).map((id) => peopleById[id]);
+}
+
+async function queryPeople(config, keyword, sortValue) {
+  const sort = actorSort(sortValue);
+  try {
+    const data = await embyGet(config, "/Persons", {
+      UserId: config.userId, SearchTerm: keyword || undefined, StartIndex: 0, Limit: 10000,
+      SortBy: sort.SortBy, SortOrder: sort.SortOrder
+    });
+    return data.Items || [];
+  } catch (error) {
+    console.warn("[/Persons] 不可用，改从媒体库聚合演员：", error.message || error);
+    const people = await getPeopleFromLibrary(config);
+    const filtered = keyword ? people.filter((person) => String(person.Name || "").toLowerCase().includes(keyword.toLowerCase())) : people;
+    return sortPeople(filtered, sortValue);
+  }
+}
+
+function pagePeople(people, page) {
+  const start = (page - 1) * PAGE_SIZE;
+  return people.slice(start, start + PAGE_SIZE);
+}
+
 async function loadActors(params = {}) {
   const config = saveConfig(params);
   const page = Math.max(1, Number(params.page || 1));
-  const sort = actorSort(params.sort);
   try {
-    const data = await embyGet(config, "/Persons", {
-      UserId: config.userId, StartIndex: (page - 1) * PAGE_SIZE, Limit: PAGE_SIZE,
-      Recursive: true, EnableImages: true, SortBy: sort.SortBy, SortOrder: sort.SortOrder
-    });
-    return (data.Items || []).map((person) => actorItem(config, person));
+    const people = await queryPeople(config, "", params.sort || "nameAsc");
+    return pagePeople(people, page).map((person) => actorItem(config, person));
   } catch (error) {
     console.error("[loadActors]", error.message || error);
     throw error;
@@ -160,11 +200,8 @@ async function searchActors(params = {}) {
   const keyword = String(params.keyword || "").trim();
   if (!keyword) return [];
   const page = Math.max(1, Number(params.page || 1));
-  const data = await embyGet(config, "/Persons", {
-    UserId: config.userId, SearchTerm: keyword, StartIndex: (page - 1) * PAGE_SIZE,
-    Limit: PAGE_SIZE, Recursive: true, EnableImages: true, SortBy: "SortName", SortOrder: "Ascending"
-  });
-  return (data.Items || []).map((person) => actorItem(config, person));
+  const people = await queryPeople(config, keyword, "nameAsc");
+  return pagePeople(people, page).map((person) => actorItem(config, person));
 }
 
 async function loadActorWorks(params = {}) {
