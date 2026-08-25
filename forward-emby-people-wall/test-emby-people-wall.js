@@ -54,6 +54,8 @@ eval(fs.readFileSync("./emby-people-wall.js", "utf8"));
   const person = await loadDetail(actors[0].link);
   assert.equal(person.title, "周星驰");
   assert.equal(person.relatedItems[0].title, "功夫");
+  assert.equal(person.relatedItems[0].mediaType, "movie");
+  assert.equal(person.episodeItems[0].title, "功夫");
   const worksCall = calls.find((call) => call.url.endsWith("/Users/u1/Items"));
   assert.ok(worksCall);
   assert.equal(worksCall.params.PersonIds, "p1");

@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "local.emby.peoplewall",
   title: "Emby 演员墙",
-  version: "1.0.0",
+  version: "1.0.1",
   requiredVersion: "0.0.1",
   description: "浏览 Emby 演员头像墙、搜索演员及按演员查看本地影片。",
   author: "Local",
@@ -131,7 +131,7 @@ function mediaItem(config, item) {
   const year = item.ProductionYear ? String(item.ProductionYear) : "";
   const rating = typeof item.CommunityRating === "number" ? item.CommunityRating : undefined;
   return {
-    id: "item." + item.Id, type: "url", title: item.Name || "未命名影片",
+    id: "item." + item.Id, type: "url", mediaType: item.Type === "Series" ? "tv" : "movie", title: item.Name || "未命名影片",
     posterPath: imageUrl(config, item.Id), backdropPath: imageUrl(config, item.Id),
     releaseDate: item.PremiereDate || undefined, rating: rating,
     description: [year, item.Overview || ""].filter(Boolean).join(" · "),
@@ -249,7 +249,7 @@ async function loadDetail(link) {
     const works = await fetchWorksByPerson(config, personName, personId, sortValue, 1);
     return {
       id: value, type: "url", title: personName + " · " + personWorkSortItems(personId, personName).filter((item) => item.link === value)[0].title,
-      description: "下拉可继续加载下一页；返回演员页可选择其他排序。", relatedItems: works
+      description: "作品列表", relatedItems: works, episodeItems: works
     };
   }
   if (value.indexOf("person:") === 0) {
@@ -259,9 +259,9 @@ async function loadDetail(link) {
     const works = await fetchWorksByPerson(config, personName, personId, "rating", 1);
     return {
       id: value, type: "url", title: personName, posterPath: imageUrl(config, personId),
-      description: "默认按评分排序。下方“排序方式”可按年份、加入时间、播放次数等重新浏览。",
+      description: "作品（默认按评分排序）",
       relatedItems: works,
-      childItems: personWorkSortItems(personId, personName)
+      episodeItems: works
     };
   }
   if (value.indexOf("item:") === 0) {
