@@ -45,7 +45,8 @@ eval(fs.readFileSync("./emby-people-wall.js", "utf8"));
   const actors = await loadActors({ ...config, page: 1, sort: "nameDesc" });
   assert.equal(actors.length, 1);
   assert.equal(actors[0].type, "url");
-  assert.equal(actors[0].link, "person:p1:%E5%91%A8%E6%98%9F%E9%A9%B0");
+  assert.equal(actors[0].id, "embyActor_p1");
+  assert.equal(actors[0].link, "embyActor:p1:%E5%91%A8%E6%98%9F%E9%A9%B0");
   assert.ok(actors[0].posterPath.includes("api_key=secret"));
   assert.equal(calls[0].params.StartIndex, 0);
   assert.equal(calls[0].params.SortBy, "SortName");
@@ -61,7 +62,7 @@ eval(fs.readFileSync("./emby-people-wall.js", "utf8"));
   assert.equal(worksCall.params.PersonIds, "p1");
   assert.equal(worksCall.params.SortBy, "CommunityRating");
 
-  const movie = await loadDetail("item:i1");
+  const movie = await loadDetail("embyMedia:i1");
   assert.equal(movie.peoples[0].title, "周星驰");
   assert.ok(movie.videoUrl.includes("/Videos/i1/stream?static=true&api_key=secret"));
   assert.equal(movie.stills, undefined);

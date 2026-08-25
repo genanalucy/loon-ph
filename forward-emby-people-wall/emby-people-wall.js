@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "local.emby.peoplewall",
   title: "Emby 演员墙",
-  version: "1.0.1",
+  version: "1.0.2",
   requiredVersion: "0.0.1",
   description: "浏览 Emby 演员头像墙、搜索演员及按演员查看本地影片。",
   author: "Local",
@@ -121,9 +121,10 @@ function workSort(value) {
 
 function actorItem(config, person) {
   return {
-    id: "person." + person.Id, type: "url", title: person.Name || "未命名演员",
+    // 不使用 person.<id>：Forward 会将该格式识别为内置人物页，导致自定义 link 不生效。
+    id: "embyActor_" + person.Id, type: "url", title: person.Name || "未命名演员",
     posterPath: imageUrl(config, person.Id), description: "演员",
-    link: "person:" + person.Id + ":" + encodeURIComponent(person.Name || "演员")
+    link: "embyActor:" + person.Id + ":" + encodeURIComponent(person.Name || "演员")
   };
 }
 
@@ -131,11 +132,11 @@ function mediaItem(config, item) {
   const year = item.ProductionYear ? String(item.ProductionYear) : "";
   const rating = typeof item.CommunityRating === "number" ? item.CommunityRating : undefined;
   return {
-    id: "item." + item.Id, type: "url", mediaType: item.Type === "Series" ? "tv" : "movie", title: item.Name || "未命名影片",
+    id: "embyMedia_" + item.Id, type: "url", mediaType: item.Type === "Series" ? "tv" : "movie", title: item.Name || "未命名影片",
     posterPath: imageUrl(config, item.Id), backdropPath: imageUrl(config, item.Id),
     releaseDate: item.PremiereDate || undefined, rating: rating,
     description: [year, item.Overview || ""].filter(Boolean).join(" · "),
-    link: "item:" + item.Id
+    link: "embyMedia:" + item.Id
   };
 }
 
@@ -233,15 +234,15 @@ function personWorkSortItems(personId, personName) {
     ["nameAsc", "按片名 A → Z"], ["random", "随机排序"]
   ];
   return options.map((option) => ({
-    id: "personWorkSort." + personId + "." + option[0], type: "url", title: option[1],
-    description: personName + "的作品", link: "personWorks:" + personId + ":" + encodeURIComponent(personName) + ":" + option[0]
+    id: "embyActorSort_" + personId + "_" + option[0], type: "url", title: option[1],
+    description: personName + "的作品", link: "embyActorWorks:" + personId + ":" + encodeURIComponent(personName) + ":" + option[0]
   }));
 }
 
 async function loadDetail(link) {
   const config = getConfig();
   const value = String(link || "");
-  if (value.indexOf("personWorks:") === 0) {
+  if (value.indexOf("embyActorWorks:") === 0) {
     const parts = value.split(":");
     const personId = parts[1];
     const sortValue = parts[parts.length - 1];
@@ -252,7 +253,7 @@ async function loadDetail(link) {
       description: "作品列表", relatedItems: works, episodeItems: works
     };
   }
-  if (value.indexOf("person:") === 0) {
+  if (value.indexOf("embyActor:") === 0) {
     const parts = value.split(":");
     const personId = parts[1];
     const personName = decodeURIComponent(parts.slice(2).join(":") || "演员");
@@ -264,8 +265,8 @@ async function loadDetail(link) {
       episodeItems: works
     };
   }
-  if (value.indexOf("item:") === 0) {
-    const itemId = value.slice(5);
+  if (value.indexOf("embyMedia:") === 0) {
+    const itemId = value.slice(10);
     const item = await embyGet(config, "/Users/" + encodeURIComponent(config.userId) + "/Items/" + encodeURIComponent(itemId), {
       Fields: "Overview,People,MediaSources,PremiereDate,ProductionYear,CommunityRating"
     });
