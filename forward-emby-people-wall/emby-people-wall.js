@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "local.emby.peoplewall",
   title: "Emby 演员墙",
-  version: "1.0.3",
+  version: "1.0.4",
   requiredVersion: "0.0.1",
   description: "浏览 Emby 演员头像墙、搜索演员及按演员查看本地影片。",
   author: "Local",
@@ -68,6 +68,8 @@ WidgetMetadata = {
 
 const PAGE_SIZE = 50;
 const CONFIG_KEY = "local.emby.peoplewall.config";
+const LIBRARY_INDEX_KEY = "local.emby.peoplewall.library-index";
+const LIBRARY_INDEX_TTL_MS = 10 * 60 * 1000;
 
 function cleanServer(server) {
   return String(server || "").replace(/\/+$/, "");
@@ -147,20 +149,53 @@ function sortPeople(people, sortValue) {
   return result.sort((left, right) => String(left.Name || "").localeCompare(String(right.Name || "")) * direction);
 }
 
-// 部分 Emby 4.9.x 服务在 /Persons 端点上会返回 500；此回退路径只依赖稳定的 Items 接口。
-async function getPeopleFromLibrary(config) {
+function indexMatchesConfig(index, config) {
+  return index && index.server === config.server && index.userId === config.userId && index.worksByPersonId &&
+    Date.now() - Number(index.createdAt || 0) < LIBRARY_INDEX_TTL_MS;
+}
+
+function sortWorks(items, sortValue) {
+  const result = items.slice();
+  if (sortValue === "random") return result.sort(() => Math.random() - 0.5);
+  const rules = {
+    rating: ["CommunityRating", -1], yearDesc: ["ProductionYear", -1], yearAsc: ["ProductionYear", 1],
+    created: ["DateCreated", -1], played: ["DateLastPlayed", -1], playCount: ["PlayCount", -1], nameAsc: ["SortName", 1]
+  };
+  const rule = rules[sortValue] || rules.rating;
+  return result.sort((left, right) => {
+    const a = left[rule[0]] == null ? "" : left[rule[0]];
+    const b = right[rule[0]] == null ? "" : right[rule[0]];
+    return String(a).localeCompare(String(b), undefined, { numeric: true }) * rule[1];
+  });
+}
+
+// 只在这里读取全库的 People；演员详情直接用该索引，避免 PersonIds 请求在 Forward 中触发 Emby 500。
+async function getLibraryIndex(config) {
+  const cached = Widget.storage.get(LIBRARY_INDEX_KEY);
+  if (indexMatchesConfig(cached, config)) return cached;
   const data = await embyGet(config, "/Users/" + encodeURIComponent(config.userId) + "/Items", {
     UserId: config.userId, IncludeItemTypes: "Movie,Series", Recursive: true,
-    StartIndex: 0, Limit: 10000, Fields: "People", EnableImages: false
+    StartIndex: 0, Limit: 10000, EnableImages: false,
+    Fields: "People,Overview,PremiereDate,ProductionYear,CommunityRating,DateCreated,DateLastPlayed,PlayCount,SortName"
   });
   const peopleById = {};
+  const worksByPersonId = {};
   (data.Items || []).forEach((item) => {
     (item.People || []).forEach((person) => {
-      if (person.Type !== "Actor" || !person.Id || peopleById[person.Id]) return;
+      if (person.Type !== "Actor" || !person.Id) return;
       peopleById[person.Id] = { Id: person.Id, Name: person.Name || "未命名演员" };
+      if (!worksByPersonId[person.Id]) worksByPersonId[person.Id] = [];
+      worksByPersonId[person.Id].push(item);
     });
   });
-  return Object.keys(peopleById).map((id) => peopleById[id]);
+  const index = { server: config.server, userId: config.userId, createdAt: Date.now(), peopleById, worksByPersonId };
+  Widget.storage.set(LIBRARY_INDEX_KEY, index);
+  return index;
+}
+
+async function getPeopleFromLibrary(config) {
+  const index = await getLibraryIndex(config);
+  return Object.keys(index.peopleById).map((id) => index.peopleById[id]);
 }
 
 async function queryPeople(config, keyword, sortValue) {
@@ -188,6 +223,8 @@ async function loadActors(params = {}) {
   const config = saveConfig(params);
   const page = Math.max(1, Number(params.page || 1));
   try {
+    // 即使 /Persons 可用，也预建演员→作品索引，点击演员时不再发送 PersonIds 查询。
+    await getLibraryIndex(config);
     const people = await queryPeople(config, "", params.sort || "nameAsc");
     return pagePeople(people, page).map((person) => actorItem(config, person));
   } catch (error) {
@@ -214,6 +251,11 @@ async function loadActorWorks(params = {}) {
 
 async function fetchWorksByPerson(config, actorName, personId, sortValue, pageValue) {
   const page = Math.max(1, Number(pageValue || 1));
+  if (personId) {
+    const index = await getLibraryIndex(config);
+    const cachedWorks = index.worksByPersonId[personId];
+    if (cachedWorks) return sortWorks(cachedWorks, sortValue).slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((item) => mediaItem(config, item));
+  }
   const sort = workSort(sortValue);
   const request = {
     UserId: config.userId, IncludeItemTypes: "Movie,Series", Recursive: true,

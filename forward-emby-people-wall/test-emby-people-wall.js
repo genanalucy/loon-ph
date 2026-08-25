@@ -48,19 +48,20 @@ eval(fs.readFileSync("./emby-people-wall.js", "utf8"));
   assert.equal(actors[0].id, "embyActor_p1");
   assert.equal(actors[0].link, "embyActor:p1:%E5%91%A8%E6%98%9F%E9%A9%B0");
   assert.ok(actors[0].posterPath.includes("api_key=secret"));
-  assert.equal(calls[0].params.StartIndex, 0);
-  assert.equal(calls[0].params.SortBy, "SortName");
-  assert.equal(calls[0].params.SortOrder, "Descending");
+  const peopleCall = calls.find((call) => call.url.endsWith("/Persons"));
+  assert.equal(peopleCall.params.StartIndex, 0);
+  assert.equal(peopleCall.params.SortBy, "SortName");
+  assert.equal(peopleCall.params.SortOrder, "Descending");
 
   const person = await loadDetail(actors[0].link);
   assert.equal(person.title, "周星驰");
   assert.equal(person.relatedItems[0].title, "功夫");
   assert.equal(person.relatedItems[0].mediaType, "movie");
   assert.equal(person.episodeItems[0].title, "功夫");
-  const worksCall = calls.find((call) => call.url.endsWith("/Items") && call.params.PersonIds);
-  assert.ok(worksCall);
-  assert.equal(worksCall.params.PersonIds, "p1");
-  assert.equal(worksCall.params.SortBy, "CommunityRating");
+  const indexCall = calls.find((call) => call.url.endsWith("/Users/u1/Items") && !call.params.PersonIds);
+  assert.ok(indexCall);
+  assert.ok(String(indexCall.params.Fields).includes("People"));
+  assert.equal(calls.some((call) => call.params.PersonIds === "p1"), false);
 
   const movie = await loadDetail("embyMedia:i1");
   assert.equal(movie.peoples[0].title, "周星驰");
@@ -71,7 +72,7 @@ eval(fs.readFileSync("./emby-people-wall.js", "utf8"));
   failPersons = true;
   const fallbackActors = await loadActors({ ...config, page: 1, sort: "nameAsc" });
   assert.equal(fallbackActors[0].title, "周星驰");
-  assert.ok(calls.some((call) => call.url.endsWith("/Users/u1/Items") && !call.params.PersonIds && call.params.Fields === "People"));
+  assert.ok(calls.some((call) => call.url.endsWith("/Users/u1/Items") && !call.params.PersonIds && String(call.params.Fields).includes("People")));
   failPersons = false;
 
   const searched = await searchActors({ ...config, keyword: "周星", page: 1 });
