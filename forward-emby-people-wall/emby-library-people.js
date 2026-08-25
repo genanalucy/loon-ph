@@ -1,7 +1,7 @@
 WidgetMetadata = {
   id: "local.emby.library.people",
   title: "Emby 影片 · 演员筛选（实验）",
-  version: "0.1.1",
+  version: "0.1.2",
   requiredVersion: "0.0.1",
   description: "从影片详情的“团队”点击演员后，尝试在同一模块显示该演员的本地作品。",
   author: "Local",
@@ -53,6 +53,26 @@ async function embyGet(config, path, params) {
   const response = await Widget.http.get(config.server + path, { params: normalizeParams(Object.assign({}, params || {}, { api_key: config.apiKey })) });
   if (!response || !response.data) throw new Error("Emby 返回为空");
   return response.data;
+}
+
+async function embyPost(config, path, params) {
+  const query = normalizeParams(Object.assign({}, params || {}, { api_key: config.apiKey }));
+  const response = await Widget.http.post(config.server + path, null, { params: query });
+  if (!response || !response.data) throw new Error("Emby 播放协商返回为空");
+  return response.data;
+}
+
+async function getPlaybackUrl(config, itemId) {
+  const playback = await embyPost(config, "/Items/" + encodeURIComponent(itemId) + "/PlaybackInfo", {
+    UserId: config.userId, IsPlayback: "true", AutoOpenLiveStream: "true"
+  });
+  const sources = playback.MediaSources || [];
+  const direct = sources.find((source) => source.SupportsDirectPlay && source.Path);
+  if (direct) return direct.Path;
+  const streamable = sources.find((source) => source.SupportsDirectStream || source.SupportsTranscoding);
+  if (!streamable) throw new Error("Emby 没有返回可播放的媒体源");
+  const mediaSourceId = encodeURIComponent(streamable.Id);
+  return config.server + "/Videos/" + encodeURIComponent(itemId) + "/stream?static=true&MediaSourceId=" + mediaSourceId + "&api_key=" + encodeURIComponent(config.apiKey);
 }
 
 function imageUrl(config, id) {
@@ -121,7 +141,7 @@ async function loadDetail(link) {
     peoples: (item.People || []).filter((person) => person.Type === "Actor" && person.Id).map((person) => ({
       id: String(person.Id), title: person.Name, avatar: imageUrl(config, person.Id), role: person.Role || "演员"
     })),
-    videoUrl: config.server + "/Videos/" + encodeURIComponent(item.Id) + "/stream?static=true&api_key=" + encodeURIComponent(config.apiKey),
+    videoUrl: await getPlaybackUrl(config, item.Id),
     playerType: "app"
   };
 }
