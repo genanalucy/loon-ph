@@ -63,7 +63,7 @@ https://cn.pornhub.com/view_video.php?viewkey=...
 在 Loon 中添加：
 
 ```text
-https://raw.githubusercontent.com/genanalucy/loon-ph/main/forward-db-online.plugin
+https://raw.githubusercontent.com/genanalucy/loon-ph/main/db-online-forward/forward-db-online.plugin
 ```
 
 然后通过 Safari 打开：
@@ -84,7 +84,7 @@ DB Online Widget 会把番号放在标题开头，例如 `MIDA-814 标题`，让
 也可以直接导入组件清单：
 
 ```text
-forward://widget?url=https%3A%2F%2Fraw.githubusercontent.com%2Fgenanalucy%2Floon-ph%2Fmain%2Fdb-online-forward.fwd
+forward://widget?url=https%3A%2F%2Fraw.githubusercontent.com%2Fgenanalucy%2Floon-ph%2Fmain%2Fdb-online-forward%2Fdb-online-forward.fwd
 ```
 
 > Loon 插件及 Widget 默认 DB Online 地址为 `10.10.10.7:9091`；服务地址变化时需同步修改配置。Forward 是否从 `forward://search` 自动展示 Widget 搜索结果取决于客户端版本；若未显示，请在 Forward 的 DB Online Widget 内搜索番号。
@@ -93,11 +93,11 @@ forward://widget?url=https%3A%2F%2Fraw.githubusercontent.com%2Fgenanalucy%2Floon
 
 - `senplayer-pornhub.plugin` / `senplayer-pornhub.js`：Pornhub 页面注入
 - `senplayer-pornhub-request.js`：Pornhub CDN 请求头修正
-- `forward-db-online.plugin` / `forward-db-online.js`：DB Online 的 Forward 安装和搜索按钮
-- `forward-db-online-widget.js`：DB Online 搜索、详情和动态播放资源 Widget
-- `xunlei-subtitle.js`：用户提供的迅雷字幕 Widget
-- `db-online-forward.fwd`：两个 Widget 的一键安装清单
-- `test-forward-pornhub.js` / `test-forward-db-online.js` / `test-forward-db-online-widget.js`：测试
+- `db-online-forward/forward-db-online.plugin` / `forward-db-online.js`：DB Online 的 Forward 安装和搜索按钮
+- `db-online-forward/forward-db-online-widget.js`：DB Online 搜索、详情和动态播放资源 Widget
+- `db-online-forward/xunlei-subtitle.js`：用户提供的迅雷字幕 Widget
+- `db-online-forward/db-online-forward.fwd`：两个 Widget 的一键安装清单
+- `test-forward-pornhub.js` / `db-online-forward/test-*.js`：测试
 
 ## License
 

@@ -1,7 +1,7 @@
 const fs = require("fs");
 const vm = require("vm");
 
-const script = fs.readFileSync("forward-db-online-widget.js", "utf8");
+const script = fs.readFileSync("db-online-forward/forward-db-online-widget.js", "utf8");
 const calls = [];
 const responses = {
     "/api/search": {

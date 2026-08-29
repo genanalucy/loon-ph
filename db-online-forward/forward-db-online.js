@@ -82,7 +82,7 @@
     });
 
     install.addEventListener("click", () => {
-        const manifest = "https://raw.githubusercontent.com/genanalucy/loon-ph/main/db-online-forward.fwd";
+        const manifest = "https://raw.githubusercontent.com/genanalucy/loon-ph/main/db-online-forward/db-online-forward.fwd";
         window.location.href = "forward://widget?url=" + encodeURIComponent(manifest);
     });
 

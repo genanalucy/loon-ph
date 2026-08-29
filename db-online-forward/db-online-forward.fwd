@@ -9,7 +9,7 @@
       "requiredVersion": "0.0.1",
       "version": "1.0.0",
       "author": "genanalucy",
-      "url": "https://raw.githubusercontent.com/genanalucy/loon-ph/main/forward-db-online-widget.js"
+      "url": "https://raw.githubusercontent.com/genanalucy/loon-ph/main/db-online-forward/forward-db-online-widget.js"
     },
     {
       "id": "xunlei.subtitle",
@@ -18,7 +18,7 @@
       "requiredVersion": "0.0.1",
       "version": "1.0.0",
       "author": "EL",
-      "url": "https://raw.githubusercontent.com/genanalucy/loon-ph/main/xunlei-subtitle.js"
+      "url": "https://raw.githubusercontent.com/genanalucy/loon-ph/main/db-online-forward/xunlei-subtitle.js"
     }
   ]
 }

@@ -1,7 +1,0 @@
-#!name=DB Online Forward
-#!desc=在 DB Online 影片详情页添加 Forward 组件安装与番号搜索按钮
-#!author=local
-#!system=iOS,iPadOS
-
-[Script]
-http-response ^http:\/\/10\.10\.10\.7:9091\/(?:video\/[^/?#]+(?:\?[^#]*)?)?$ script-path=https://raw.githubusercontent.com/genanalucy/loon-ph/main/forward-db-online.js, requires-body=true, timeout=10, tag=DB Online Forward, enable=true
