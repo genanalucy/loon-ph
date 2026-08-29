@@ -72,29 +72,32 @@ https://raw.githubusercontent.com/genanalucy/loon-ph/main/forward-db-online.plug
 http://10.10.10.7:9091/video/MIDA-814?video_id=DRX1yM
 ```
 
-右下角会显示“Forward 播放”。展开后可分别测试：
+首次使用：
 
-- 原始 URL（对照组）
-- `title`
-- `name`
-- `filename`
-- `fileName`
-- `displayName`
-- `mediaTitle`
-- `videoTitle`
-- `label`
-- URL `#标题.mp4` fragment
+1. 点击右下角“首次安装组件”，在 Forward 中安装 `DB Online` 和“迅雷看看 字幕”；
+2. 返回 Safari 影片页，点击“Forward 搜索 MIDA-814”；
+3. 在 Forward 搜索结果中打开 DB Online 条目并播放；
+4. 在播放器字幕菜单中选择“迅雷看看 字幕”的搜索结果。
 
-每次点击都会重新请求 `/api/library/stream/:code`，避免使用过期签名。每个按钮只携带一种候选标题参数，方便确认当前 Forward 版本实际支持哪种写法。Forward 官方目前只公开 `forward://play?url=`，其他标题参数均属于兼容性测试。
+DB Online Widget 会把番号放在标题开头，例如 `MIDA-814 标题`，让字幕 Widget 能提取番号；真正播放时才请求 `/api/library/stream/:code`，避免使用过期地址。
 
-> 插件配置中的 DB Online 地址固定为 `10.10.10.7:9091`；如果服务地址变化，需要同步修改 `forward-db-online.plugin`。
+也可以直接导入组件清单：
+
+```text
+forward://widget?url=https%3A%2F%2Fraw.githubusercontent.com%2Fgenanalucy%2Floon-ph%2Fmain%2Fdb-online-forward.fwd
+```
+
+> Loon 插件及 Widget 默认 DB Online 地址为 `10.10.10.7:9091`；服务地址变化时需同步修改配置。Forward 是否从 `forward://search` 自动展示 Widget 搜索结果取决于客户端版本；若未显示，请在 Forward 的 DB Online Widget 内搜索番号。
 
 ## 文件
 
 - `senplayer-pornhub.plugin` / `senplayer-pornhub.js`：Pornhub 页面注入
 - `senplayer-pornhub-request.js`：Pornhub CDN 请求头修正
-- `forward-db-online.plugin` / `forward-db-online.js`：DB Online 的 Forward 播放按钮
-- `test-forward-pornhub.js` / `test-forward-db-online.js`：测试
+- `forward-db-online.plugin` / `forward-db-online.js`：DB Online 的 Forward 安装和搜索按钮
+- `forward-db-online-widget.js`：DB Online 搜索、详情和动态播放资源 Widget
+- `xunlei-subtitle.js`：用户提供的迅雷字幕 Widget
+- `db-online-forward.fwd`：两个 Widget 的一键安装清单
+- `test-forward-pornhub.js` / `test-forward-db-online.js` / `test-forward-db-online-widget.js`：测试
 
 ## License
 

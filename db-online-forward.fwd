@@ -1,0 +1,24 @@
+{
+  "title": "DB Online + 迅雷字幕",
+  "description": "DB Online 媒体库播放与迅雷字幕搜索",
+  "widgets": [
+    {
+      "id": "forward.db-online",
+      "title": "DB Online",
+      "description": "搜索 DB Online 媒体库并动态加载播放地址",
+      "requiredVersion": "0.0.1",
+      "version": "1.0.0",
+      "author": "genanalucy",
+      "url": "https://raw.githubusercontent.com/genanalucy/loon-ph/main/forward-db-online-widget.js"
+    },
+    {
+      "id": "xunlei.subtitle",
+      "title": "迅雷看看 字幕",
+      "description": "按影片标题或番号搜索迅雷字幕",
+      "requiredVersion": "0.0.1",
+      "version": "1.0.0",
+      "author": "EL",
+      "url": "https://raw.githubusercontent.com/genanalucy/loon-ph/main/xunlei-subtitle.js"
+    }
+  ]
+}

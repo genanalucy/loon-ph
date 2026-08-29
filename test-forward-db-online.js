@@ -17,16 +17,10 @@ function assert(condition, message) {
 }
 
 const injected = run("<!doctype html><html><body><div id=\"app\"></div></body></html>");
-assert(injected.response.body.includes("forward-db-online-toggle"), "应注入播放按钮");
-assert(injected.response.body.includes('data-mode="title"'), "应包含 title 测试");
-assert(injected.response.body.includes('data-mode="name"'), "应包含 name 测试");
-assert(injected.response.body.includes('data-mode="filename"'), "应包含 filename 测试");
-assert(injected.response.body.includes('data-mode="fileName"'), "应包含 fileName 测试");
-assert(injected.response.body.includes('data-mode="displayName"'), "应包含 displayName 测试");
-assert(injected.response.body.includes('data-mode="mediaTitle"'), "应包含 mediaTitle 测试");
-assert(injected.response.body.includes('data-mode="videoTitle"'), "应包含 videoTitle 测试");
-assert(injected.response.body.includes('data-mode="label"'), "应包含 label 测试");
-assert(injected.response.body.includes('data-mode="fragment"'), "应包含 fragment 测试");
+assert(injected.response.body.includes("forward-db-online-play"), "应注入搜索按钮");
+assert(injected.response.body.includes("forward://search?q="), "应通过番号打开 Forward 搜索");
+assert(injected.response.body.includes("forward://widget?url="), "应提供 Forward 组件安装入口");
+assert(injected.response.body.includes("db-online-forward.fwd"), "应安装 DB Online 与字幕组件清单");
 assert(!Object.keys(injected.response.headers).some(key => key.toLowerCase() === "content-length"), "应删除 Content-Length");
 
 const duplicate = run(injected.response.body, injected.response.headers);
