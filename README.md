@@ -1,8 +1,9 @@
 # loon-ph
 
-一个用于 Loon 的 Pornhub → SenPlayer 辅助插件。
+一组用于 Loon 的网页播放器辅助插件：
 
-它会在 Pornhub 视频详情页右下角添加“SenPlayer 播放”按钮，提取可用的最高画质 MP4，通过 SenPlayer URL Scheme 打开，并将该条目保存到 SenPlayer 的 URL 列表/历史记录。
+- Pornhub → SenPlayer：提取最高画质 MP4 并调用 SenPlayer。
+- DB Online → Forward：获取媒体库的最新播放地址并调用 Forward。
 
 ## 支持域名
 
@@ -56,6 +57,44 @@ https://cn.pornhub.com/view_video.php?viewkey=...
 - `senplayer-pornhub.plugin`：Loon 插件配置
 - `senplayer-pornhub.js`：HTML 响应注入与 SenPlayer 跳转脚本
 - `senplayer-pornhub-request.js`：SenPlayer MP4 CDN 请求头修正脚本
+
+## DB Online → Forward
+
+在 Loon 中添加：
+
+```text
+https://raw.githubusercontent.com/genanalucy/loon-ph/main/forward-db-online.plugin
+```
+
+然后通过 Safari 打开：
+
+```text
+http://10.10.10.7:9091/video/MIDA-814?video_id=DRX1yM
+```
+
+右下角会显示“Forward 播放”。展开后可分别测试：
+
+- 原始 URL（对照组）
+- `title`
+- `name`
+- `filename`
+- `fileName`
+- `displayName`
+- `mediaTitle`
+- `videoTitle`
+- `label`
+- URL `#标题.mp4` fragment
+
+每次点击都会重新请求 `/api/library/stream/:code`，避免使用过期签名。每个按钮只携带一种候选标题参数，方便确认当前 Forward 版本实际支持哪种写法。Forward 官方目前只公开 `forward://play?url=`，其他标题参数均属于兼容性测试。
+
+> 插件配置中的 DB Online 地址固定为 `10.10.10.7:9091`；如果服务地址变化，需要同步修改 `forward-db-online.plugin`。
+
+## 文件
+
+- `senplayer-pornhub.plugin` / `senplayer-pornhub.js`：Pornhub 页面注入
+- `senplayer-pornhub-request.js`：Pornhub CDN 请求头修正
+- `forward-db-online.plugin` / `forward-db-online.js`：DB Online 的 Forward 播放按钮
+- `test-forward-pornhub.js` / `test-forward-db-online.js`：测试
 
 ## License
 
