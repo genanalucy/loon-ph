@@ -1,7 +1,7 @@
 WidgetMetadata = {
     id: "forward.pornhub",
     title: "Pornhub",
-    version: "1.2.3",
+    version: "1.2.4",
     requiredVersion: "0.0.1",
     description: "Pornhub 公开热门、搜索、播放、相关推荐与创作者作品",
     author: "genanalucy",
@@ -37,7 +37,9 @@ WidgetMetadata = {
                       { title: "原顺序", value: "original" },
                       { title: "随机排序（当前页）", value: "random" }
                   ] },
-                { name: "page", title: "页码", type: "page" }
+                { name: "page", title: "页码", type: "page" },
+                { name: "forceRefresh", title: "缓存模式", type: "enumeration", value: "cache",
+                  enumOptions: [{ title: "优先缓存", value: "cache" }, { title: "每次强制刷新", value: "refresh" }] }
             ]
         },
         {
@@ -60,7 +62,11 @@ WidgetMetadata = {
             title: "关注更新",
             functionName: "loadFavoriteUpdates",
             cacheDuration: 0,
-            params: [{ name: "page", title: "页码", type: "page" }]
+            params: [
+                { name: "page", title: "页码", type: "page" },
+                { name: "forceRefresh", title: "缓存模式", type: "enumeration", value: "cache",
+                  enumOptions: [{ title: "优先缓存", value: "cache" }, { title: "每次强制刷新", value: "refresh" }] }
+            ]
         },
         {
             id: "loadCreatorWall",
@@ -446,8 +452,31 @@ function accountContent(html, actors, path) {
     throw new Error("账号视频列表结构未识别，需要登录后的页面样本；未使用导航推荐代替");
 }
 
-async function loadFavorites(params = {}) {
-    if (params.peopleId != null) return routeCreatorWorks(params);
+async function cachedAccountItems(kind, params, ttl, loader) {
+    const username = String(params.accountUsername || "genanalucy").trim();
+    if (!/^[A-Za-z0-9_-]+$/.test(username)) throw new Error("用户名格式无效");
+    const key = "ph-account-items:v1:" + username.toLowerCase() + ":" + kind + ":" + accountPageNumber(params);
+    const storage = Widget.storage;
+    if (params.forceRefresh !== "refresh" && storage && typeof storage.get === "function") {
+        try {
+            const cached = storage.get(key);
+            const data = typeof cached === "string" ? JSON.parse(cached) : cached;
+            const age = data ? Date.now() - data.savedAt : NaN;
+            if (data && Number.isFinite(age) && age >= 0 && age < ttl && Array.isArray(data.items)) {
+                return JSON.parse(JSON.stringify(data.items));
+            }
+        } catch (_) { /* 损坏缓存按未命中处理。 */ }
+    }
+    // 不吞登录或解析错误，也不以过期数据冒充最新账号内容。
+    const items = await loader();
+    if (storage && typeof storage.set === "function") {
+        try { storage.set(key, JSON.stringify({ savedAt: Date.now(), items })); }
+        catch (_) { console.warn("[Pornhub] 关注缓存写入失败"); }
+    }
+    return JSON.parse(JSON.stringify(items));
+}
+
+async function fetchSubscribedCreators(params = {}) {
     const username = String(params.accountUsername || "genanalucy").trim();
     if (!/^[A-Za-z0-9_-]+$/.test(username)) throw new Error("用户名格式无效");
     const html = accountContent(await requestAccountPage("/users/" + username + "/subscriptions", params), true);
@@ -470,6 +499,12 @@ async function loadFavorites(params = {}) {
         items.push(item);
     }
     if (!items.length && accountPageNumber(params) === 1) throw new Error("未解析到订阅人物；请确认账号有关注，或提供登录后的人物页面抓包");
+    return items;
+}
+
+async function loadFavorites(params = {}) {
+    if (params.peopleId != null) return routeCreatorWorks(params);
+    const items = await cachedAccountItems("actors", params, 6 * 60 * 60 * 1000, () => fetchSubscribedCreators(params));
     if (params.sortOrder === "random") {
         for (let index = items.length - 1; index > 0; index -= 1) {
             const swapIndex = Math.floor(Math.random() * (index + 1));
@@ -489,7 +524,8 @@ async function loadAccountVideos(params, path) {
 }
 
 async function loadFavoriteUpdates(params = {}) {
-    return loadAccountVideos(params, "/subscriptions");
+    if (params.peopleId != null) return routeCreatorWorks(params);
+    return cachedAccountItems("updates", params, 5 * 60 * 1000, () => loadAccountVideos(params, "/subscriptions"));
 }
 
 async function loadRecommended(params = {}) {
