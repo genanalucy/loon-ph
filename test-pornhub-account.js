@@ -28,11 +28,17 @@ for (const badUrl of ['https://cn.pornhub.com.evil.test/recommended', 'https://c
 }
 const calls = [];
 let logged = true;
+let mobile = false;
 const card = '<li class="pcVideoListItem"><a href="/view_video.php?viewkey=account123">Account Video</a></li>';
 const c = { console, Widget: { http: { async get(target, options) {
     calls.push({ target, options });
     const signal = 'var isLoggedInUser = ' + Number(logged) + ';';
     if (target.includes('/users/')) return { data: signal + '<div class="profileContentLeft"><a href="/model/example"><img src="//img.test/actor.jpg" alt="Example"></a><a href="https://evil.test/model/no">Wrong</a></div><div class="profileContentRight">' };
+    if (mobile) {
+        const wrapper = target.endsWith('/recommended') ? 'recommendedVideosContainer' : 'subscriptionsVideosWrapper mobile';
+        return { data: signal + '<header><ul class="videoList">' + card.replace(/account123/g, 'navWrong') + '</ul></header>' +
+            '<div class="' + wrapper + '"><div class="nested">Filters</div><ul class="videoList clearfix latestThumbDesign">' + card + '</ul></div>' };
+    }
     return { data: signal + '<ul id="' + (target.endsWith('/recommended') ? 'recommendedListings' : 'subscriptionsVideosSection') + '">' + card + '</ul>' };
 } } } };
 vm.createContext(c);
@@ -52,6 +58,20 @@ vm.runInContext(fs.readFileSync('forward-pornhub.js', 'utf8'), c);
         assert.equal(call.options.headers['X-PH-Widget-Auth'], '1');
         assert.equal(call.options.headers.Cookie, undefined);
     }
+    mobile = true;
+    for (const name of ['loadFavoriteUpdates', 'loadRecommended']) {
+        const videos = await c[name]({ page: 2 });
+        assert.equal(videos.length, 1);
+        assert.equal(videos[0].link, 'video:account123');
+        assert.equal(calls[calls.length - 1].options.params.page, 2);
+    }
+    for (const path of ['/subscriptions', '/recommended']) {
+        assert.throws(() => c.accountContent('<main><ul class="videoList">' + card + '</ul></main>', false, path), /结构未识别/);
+        assert.throws(() => c.accountContent('<div class="not-recommendedVideosContainer"><ul class="videoList">' + card + '</ul></div>', false, path), /结构未识别/);
+    }
+    assert.equal(c.accountContent('<div class="subscriptionsVideosWrapper mobile"><ul class="videoList"></ul></div>', false, '/subscriptions'), '<ul class="videoList"></ul>');
+    assert.throws(() => c.accountContent('<div class="subscriptionsVideosWrapper mobile"><ul class="videoList">' + card + '</ul></div>', false, '/recommended'), /结构未识别/);
+    assert.equal(c.WidgetMetadata.version, '1.2.1');
     logged = false;
     await assert.rejects(c.loadRecommended({}), /登录状态/);
     await assert.rejects(c.loadFavorites({ accountUsername: '../bad' }), /用户名格式/);

@@ -1,7 +1,7 @@
 WidgetMetadata = {
     id: "forward.pornhub",
     title: "Pornhub",
-    version: "1.2.0",
+    version: "1.2.1",
     requiredVersion: "0.0.1",
     description: "Pornhub 公开热门、搜索、播放、相关推荐与创作者作品",
     author: "genanalucy",
@@ -387,7 +387,36 @@ async function requestAccountPage(path, params) {
     return html;
 }
 
-function accountContent(html, actors) {
+function accountMobileVideoList(html, path) {
+    const expectedClass = path === "/subscriptions" ? "subscriptionsVideosWrapper" :
+        path === "/recommended" ? "recommendedVideosContainer" : "";
+    if (!expectedClass) return null;
+    const tags = /<\/?div\b[^>]*>/gi;
+    let tag;
+    while ((tag = tags.exec(html))) {
+        if (/^<\//.test(tag[0]) || !attrValue(tag[0], "class").split(/\s+/).includes(expectedClass)) continue;
+        const start = tags.lastIndex;
+        let depth = 1;
+        while ((tag = tags.exec(html))) {
+            depth += /^<\//.test(tag[0]) ? -1 : 1;
+            if (depth === 0) {
+                const section = html.slice(start, tag.index);
+                const lists = /<ul\b[^>]*>/gi;
+                let list;
+                while ((list = lists.exec(section))) {
+                    if (!attrValue(list[0], "class").split(/\s+/).includes("videoList")) continue;
+                    const end = section.indexOf("</ul>", lists.lastIndex);
+                    if (end >= 0) return section.slice(list.index, end + 5);
+                }
+                return null;
+            }
+        }
+        return null;
+    }
+    return null;
+}
+
+function accountContent(html, actors, path) {
     if (actors) {
         const start = html.search(/<div\b[^>]*class=["'][^"']*\bprofileContentLeft\b/i);
         if (start < 0) throw new Error("订阅人物结构未识别；需要登录后的页面样本，未回退到固定演员");
@@ -399,9 +428,9 @@ function accountContent(html, actors) {
         const end = html.indexOf("</ul>", start.index + start[0].length);
         return html.slice(start.index, end < 0 ? html.length : end);
     }
-    // Remove header/navigation so their unrelated videos can never masquerade as account results.
-    const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i);
-    if (main) return main[1];
+    // 手机页没有桌面列表 ID，仅在当前账号入口的专属容器中找 videoList。
+    const mobileList = accountMobileVideoList(html, path);
+    if (mobileList !== null) return mobileList;
     throw new Error("账号视频列表结构未识别，需要登录后的页面样本；未使用导航推荐代替");
 }
 
@@ -434,7 +463,7 @@ async function loadFavorites(params = {}) {
 
 async function loadAccountVideos(params, path) {
     if (params.peopleId != null) return routeCreatorWorks(params);
-    const items = parseVideoCards(accountContent(await requestAccountPage(path, params), false));
+    const items = parseVideoCards(accountContent(await requestAccountPage(path, params), false, path));
     if (!items.length && accountPageNumber(params) === 1) throw new Error("账号视频列表为空或结构尚未适配；未使用游客视频代替");
     return items;
 }
