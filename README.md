@@ -58,6 +58,14 @@ https://cn.pornhub.com/view_video.php?viewkey=...
 - `senplayer-pornhub.js`：HTML 响应注入与 SenPlayer 跳转脚本
 - `senplayer-pornhub-request.js`：SenPlayer MP4 CDN 请求头修正脚本
 
+## 独立演员头像 Widget（实验）
+
+导入 `https://raw.githubusercontent.com/genanalucy/loon-ph/main/forward-pornhub-actors.js`，在首页添加其“演员头像墙”，使用普通海报墙布局，而非内置热门人物组件。全局参数“演员主页”每行填一个 Pornhub 主页 URL。每位演员独立卡片，封面为主页头像，`link` 为对应主页 URL。
+
+点击卡片通过 `loadDetail` 展示演员作品。此独立实验只验证头像和 URL 绑定，不提供作品播放解析；播放请继续使用原 Pornhub Widget。头像提取优先使用真实主页的 `img#getAvatar`，不使用任意首图冒充头像。头像无法读取时保留姓名和 URL。
+
+测试：`node test-forward-pornhub-actors.js`。客户端海报显示及点击效果未验证。
+
 ## Pornhub Widget 演员作品路由
 
 `forward-pornhub.js` 的 `1.1.3` 版本统一处理首页、收藏演员、收藏更新、演员作品墙及搜索入口的 `peopleId`。点击详情页创作者时，返回目标演员的作品，而不是原收藏列表或预选演员。
