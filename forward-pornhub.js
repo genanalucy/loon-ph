@@ -1,7 +1,7 @@
 WidgetMetadata = {
     id: "forward.pornhub",
     title: "Pornhub",
-    version: "1.1.6",
+    version: "1.1.7",
     requiredVersion: "0.0.1",
     description: "Pornhub 公开热门、搜索、播放、相关推荐与创作者作品",
     author: "genanalucy",
@@ -209,7 +209,7 @@ function videoItemFromCard(card) {
     }
     const title = cleanText(titledLink && titledLink[1]) || fallbackTitles.sort((a, b) => b.length - a.length)[0] || "";
     const imageMatch = card.match(/<(?:img)\b[^>]*(?:data-poster|src)\s*=\s*["']([^"']+)["']/i);
-    const durationMatch = card.match(/class\s*=\s*["'][^"']*\btime\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/i);
+    const durationMatch = card.match(/class\s*=\s*["'][^"']*\b(?:time|duration)\b[^"']*["'][^>]*>([^<]*)<\/(?:span|var)>/i);
     const uploaderMatch = card.match(/<a\b[^>]*class\s*=\s*["'][^"']*uploaderLink[^"']*["'][^>]*href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i);
     const viewMatch = card.match(/class\s*=\s*["'][^"']*videoViews[^"']*["'][^>]*>[\s\S]*?<\/i>\s*([^<]+)/i);
     if (!title) return null;
@@ -233,13 +233,17 @@ function videoItemFromCard(card) {
 function parseVideoCards(html) {
     const source = String(html || "");
     const starts = [];
-    const marker = /<div\b[^>]*class\s*=\s*["'][^"']*\bvideoWrapper\b[^"']*["'][^>]*>/gi;
+    const marker = /<(?:div|li)\b[^>]*class\s*=\s*["'][^"']*\b(?:videoWrapper|pcVideoListItem)\b[^"']*["'][^>]*>/gi;
     let match;
     while ((match = marker.exec(source))) starts.push(match.index);
     const results = [];
     const seen = {};
     for (let index = 0; index < starts.length; index += 1) {
-        const card = source.slice(starts[index], starts[index + 1] || source.length);
+        let card = source.slice(starts[index], starts[index + 1] || source.length);
+        if (/^<li\b/i.test(card)) {
+            const end = card.indexOf("</li>");
+            if (end !== -1) card = card.slice(0, end + 5);
+        }
         const item = videoItemFromCard(card);
         if (item && !seen[item.id]) {
             seen[item.id] = true;
@@ -440,48 +444,53 @@ async function search(params = {}) {
     return parseVideoCards(html);
 }
 
-function creatorSeasonItem(creator, path, season) {
-    const link = "ph-season:" + season + ":" + path;
-    return Object.assign({}, creator, {
-        id: link, link,
-        title: creator.title + " · 第 " + season + " 季",
-        description: "每季最多 20 集，按演员主页顺序分组；新片发布可能改变分组。"
-    });
+function creatorPageVideos(html) {
+    const source = String(html || "");
+    const list = /<ul\b[^>]*\bid\s*=\s*["'](?:modelMostRecentVideosSection|pornstarsVideos|mostRecentVideosSection)["'][^>]*>/i.exec(source);
+    if (!list) return parseVideoCards(source);
+    const start = list.index + list[0].length;
+    const end = source.indexOf("</ul>", start);
+    return parseVideoCards(source.slice(start, end < 0 ? source.length : end));
 }
 
-async function creatorSeasonDetail(path, season) {
+async function creatorEpisodesDetail(path) {
     let html = readCreatorCache(path);
     if (!html) {
         html = await requestPage("/" + path, {});
         writeCreatorCache(path, html);
     }
     const creator = creatorItem(path, html);
-    const start = (season - 1) * 20;
     const videos = [];
     const seen = {};
-    // 按真实页面累积，不能假定网站每页永远恰好有 20 部。
-    for (let page = 1; page <= 100; page += 1) {
-        const pageHtml = page === 1 ? html : await requestPage("/" + path, { page });
-        const items = parseVideoCards(pageHtml);
-        let added = 0;
-        for (const item of items) {
-            if (seen[item.id]) continue;
-            seen[item.id] = true;
-            videos.push(item);
-            added += 1;
+    // 最多抓取 5 页、50 部；后续页失败不能丢弃已加载的分集。
+    for (let page = 1; page <= 5 && videos.length < 50; page += 1) {
+        let pageHtml = html;
+        if (page > 1) {
+            try { pageHtml = await requestPage("/" + path, { page }); }
+            catch (error) {
+                console.warn("[Pornhub] 后续作品加载失败，保留已有分集:", String(error));
+                break;
+            }
         }
-        if (!added || videos.length > start + 20) break;
+        const items = creatorPageVideos(pageHtml);
+        let added = 0;
+        for (const video of items) {
+            if (seen[video.id]) continue;
+            seen[video.id] = true;
+            videos.push(video);
+            added += 1;
+            if (videos.length === 50) break;
+        }
+        if (!added) break;
     }
-    const item = creatorSeasonItem(creator, path, season);
-    item.episodeItems = videos.slice(start, start + 20).map((video, index) => Object.assign({}, video, {
-        mediaType: "tv", season, episode: index + 1, playerType: "app",
-        peoples: [{ id: linkForCreator(path), title: creator.title, avatar: creator.coverUrl, role: "创作者" }]
-    }));
-    item.relatedItems = [];
-    if (season > 1) item.relatedItems.push(creatorSeasonItem(creator, path, season - 1));
-    if (season < 100 && videos.length > start + 20) item.relatedItems.push(creatorSeasonItem(creator, path, season + 1));
-    if (!item.episodeItems.length) item.description = "该季暂无影片，请返回上一季。";
-    return item;
+    if (!videos.length) throw new Error("未找到该演员的公开影片；请刷新或检查主页");
+    return Object.assign(creator, {
+        description: "演员作品集 · 单季 " + videos.length + " 集（最多 50 集）",
+        episodeItems: videos.map((video, index) => Object.assign({}, video, {
+            mediaType: "tv", season: 1, episode: index + 1, playerType: "app",
+            peoples: [{ id: linkForCreator(path), title: creator.title, avatar: creator.coverUrl, role: "创作者" }]
+        }))
+    });
 }
 
 async function loadDetail(link) {
@@ -497,21 +506,13 @@ async function loadDetail(link) {
     if (value.indexOf("ph-season:") === 0) {
         const match = value.match(/^ph-season:([1-9][0-9]*):((?:model|pornstar|channels|users)\/[A-Za-z0-9_-]+)$/i);
         if (!match || Number(match[1]) > 100) return null;
-        return creatorSeasonDetail(match[2], Number(match[1]));
+        // 兼容已缓存的旧季卡片，统一回到单季作品集。
+        return creatorEpisodesDetail(match[2]);
     }
     if (value.indexOf("creator:") === 0) {
         const path = value.slice("creator:".length).replace(/^\/+/, "");
         if (!/^(?:model|pornstar|channels|users)\/[A-Za-z0-9_-]+$/i.test(path)) return null;
-        let html = readCreatorCache(path);
-        if (!html) {
-            html = await requestPage("/" + path, {});
-            writeCreatorCache(path, html);
-        }
-        const creator = creatorItem(path, html);
-        return Object.assign(creator, {
-            description: "打开第 1 季查看影片，每 20 集分为一季；季详情底部可进入下一季。",
-            relatedItems: [creatorSeasonItem(creator, path, 1)]
-        });
+        return creatorEpisodesDetail(path);
     }
     if (value.indexOf("video:") !== 0) return null;
     const key = value.slice("video:".length);

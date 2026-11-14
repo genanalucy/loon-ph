@@ -34,6 +34,11 @@ const sandbox = {
         calls.push({ url, options });
         if (url.endsWith("/view_video.php")) return { data: detail };
         if (url.includes("/video/get_media")) return { data: [{ quality: "1080", height: 1080, format: "mp4", videoUrl: "https://cdn.example/1080.mp4" }] };
+        if (url.endsWith("/model/failing") && options.params.page) throw new Error("page failed");
+        if (url.endsWith("/model/fifty")) {
+          const start = (Number(options.params.page || 1) - 1) * 20;
+          return { data: Array.from({ length: 20 }, (_, i) => homeCard.replace(/abc123/g, "clip" + (start + i))).join("") };
+        }
         if (url.endsWith("/model/seasons")) {
           const page = Number(options.params.page || 1);
           const start = (page - 1) * 20;
@@ -81,9 +86,8 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
   assert.equal(creatorDetail.link, "creator:pornstar/alice");
   assert.equal(creatorDetail.mediaType, "tv");
   assert.equal(creatorDetail.posterPath, "https://img.example/avatar.jpg");
-  assert.equal(creatorDetail.episodeItems, undefined);
-  assert.equal(creatorDetail.relatedItems[0].link, "ph-season:1:pornstar/alice");
-  const firstSeason = await sandbox.loadDetail(creatorDetail.relatedItems[0].link);
+  assert.equal(creatorDetail.relatedItems, undefined);
+  const firstSeason = creatorDetail;
   assert.equal(firstSeason.episodeItems.length, 1);
   assert.equal(firstSeason.episodeItems[0].link, "video:abc123");
   assert.equal(firstSeason.episodeItems[0].episode, 1);
@@ -95,15 +99,15 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
   sandbox.Widget.storage.set("creator-page:model/creator-cache", homeCard);
   const callsBeforeCachedDetail = calls.length;
   const cachedCreatorDetail = await sandbox.loadDetail("creator:model/creator-cache");
-  assert.equal(cachedCreatorDetail.relatedItems[0].link, "ph-season:1:model/creator-cache");
-  assert.equal(calls.length, callsBeforeCachedDetail);
+  assert.equal(cachedCreatorDetail.episodeItems[0].link, "video:abc123");
+  assert.equal(calls.length, callsBeforeCachedDetail + 1);
 
   const favorites = await sandbox.loadFavorites({ favoriteCreators: "https://www.pornhub.com/pornstar/alice\n/model/bob\ninvalid" });
   assert.equal(favorites.length, 2);
   assert.equal(favorites[0].link, "creator:pornstar/alice");
   assert.equal(favorites[1].link, "creator:model/bob");
 
-  assert.equal(sandbox.WidgetMetadata.version, "1.1.6");
+  assert.equal(sandbox.WidgetMetadata.version, "1.1.7");
   const creatorWallModule = sandbox.WidgetMetadata.modules.find(module => module.id === "loadCreatorWall");
   assert.equal(sandbox.WidgetMetadata.modules.length, 6);
   assert.equal(creatorWallModule.cacheDuration, 0);
@@ -178,21 +182,13 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
   await sandbox.loadResource(series.episodeItems[1]);
   assert.equal(calls[episodeCount].options.params.viewkey, "episode2");
   const season1 = await sandbox.loadDetail("ph-season:1:model/seasons");
-  assert.equal(season1.episodeItems.length, 20);
-  assert.equal(season1.episodeItems[19].link, "video:seasonVideo20");
-  assert.equal(season1.relatedItems[0].link, "ph-season:2:model/seasons");
-  const season2 = await sandbox.loadDetail(season1.relatedItems[0].link);
-  assert.equal(season2.episodeItems.length, 20);
-  assert.equal(season2.episodeItems[0].link, "video:seasonVideo21");
-  assert.equal(season2.episodeItems[0].season, 2);
-  assert.equal(season2.episodeItems[0].episode, 1);
-  assert.equal(season2.relatedItems[1].link, "ph-season:3:model/seasons");
-  const season3 = await sandbox.loadDetail(season2.relatedItems[1].link);
-  assert.equal(season3.episodeItems.length, 5);
-  assert.equal(season3.episodeItems[4].link, "video:seasonVideo45");
-  assert.equal(season3.relatedItems.length, 1);
+  assert.equal(season1.episodeItems.length, 45);
+  assert.equal(season1.episodeItems[44].link, "video:seasonVideo45");
+  assert.equal(season1.episodeItems[44].episode, 45);
+  assert.equal(season1.episodeItems[44].season, 1);
+  assert.equal(season1.relatedItems, undefined);
   const seasonCalls = calls.length;
-  await sandbox.loadResource(season2.episodeItems[0]);
+  await sandbox.loadResource(season1.episodeItems[20]);
   assert.equal(calls[seasonCalls].options.params.viewkey, "seasonVideo21");
   for (const invalid of ["ph-season:0:model/test", "ph-season:101:model/test", "ph-season:2:../test"]) {
     const before = calls.length;
@@ -200,6 +196,20 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
     assert.equal(calls.length, before);
   }
   assert.equal(sandbox.creatorItem("model/no-avatar", '<img src="https://img.test/video.jpg">').coverUrl, "");
+  const fiftyCalls = calls.length;
+  const fifty = await sandbox.loadDetail("creator:model/fifty");
+  assert.equal(fifty.episodeItems.length, 50);
+  assert.equal(fifty.episodeItems[49].link, "video:clip49");
+  assert.equal(calls.length - fiftyCalls, 3);
+  const partial = await sandbox.loadDetail("creator:model/failing");
+  assert.equal(partial.episodeItems.length, 1);
+  const desktop = homeCard.replace('<div class="positionRelative videoWrapper js-video-element">', '<li class="pcVideoListItem videoblock">').replace(/<\/div>\s*$/, '</li>');
+  assert.equal(sandbox.parseVideoCards(desktop)[0].link, "video:abc123");
+  const scoped = '<li class="pcVideoListItem">' + homeCard.replace(/abc123/g, "navVideo") + '</li>' +
+    '<ul id="modelMostRecentVideosSection">' + desktop + '</ul>';
+  const scopedWorks = sandbox.creatorPageVideos(scoped);
+  assert.equal(scopedWorks.length, 1);
+  assert.equal(scopedWorks[0].link, "video:abc123");
   const beforeBadHub = calls.length;
   for (const link of ["ph-people:%", "ph-people:", "ph-people:" + encodeURIComponent("../bad")]) {
     assert.equal(await sandbox.loadDetail(link), null);
