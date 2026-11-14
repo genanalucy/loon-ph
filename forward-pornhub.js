@@ -1,7 +1,7 @@
 WidgetMetadata = {
     id: "forward.pornhub",
     title: "Pornhub",
-    version: "1.1.2",
+    version: "1.1.3",
     requiredVersion: "0.0.1",
     description: "Pornhub 公开热门、搜索、播放、相关推荐与创作者作品",
     author: "genanalucy",
@@ -29,14 +29,14 @@ WidgetMetadata = {
             title: "收藏演员",
             functionName: "loadFavorites",
             cacheDuration: 300,
-            params: []
+            params: [{ name: "page", title: "页码", type: "page" }]
         },
         {
             id: "loadFavoriteUpdates",
             title: "收藏更新",
             functionName: "loadFavoriteUpdates",
             cacheDuration: 300,
-            params: []
+            params: [{ name: "page", title: "页码", type: "page" }]
         },
         {
             id: "loadCreatorWall",
@@ -69,9 +69,9 @@ WidgetMetadata = {
                 value: "latest",
                 enumOptions: [
                     { title: "最新发布", value: "latest" },
-                    { title: "随机排列", value: "random" }
+                    { title: "当前页随机排列", value: "random" }
                 ]
-            }]
+            }, { name: "page", title: "页码", type: "page" }]
         },
         {
             id: "loadResource",
@@ -292,16 +292,44 @@ async function requestPage(path, params) {
     return response.data;
 }
 
-async function loadList(params = {}) {
-    const page = Math.max(1, Number(params.page || 1));
-    const creatorLink = String(params.peopleId || "");
-    if (creatorLink.indexOf("creator:") === 0) {
-        const path = creatorLink.slice("creator:".length).replace(/^\/+/, "");
-        const html = await requestPage("/" + path, page > 1 ? { page } : {});
-        const items = parseVideoCards(html);
-        if (!items.length) throw new Error("未找到该创作者的公开作品");
-        return items;
+function creatorPathFromPeopleId(value) {
+    const match = String(value || "").match(/^creator:((?:model|pornstar|channels|users)\/[A-Za-z0-9_-]+)$/i);
+    return match ? match[1] : "";
+}
+
+async function loadCreatorWorks(path, params = {}) {
+    const pageValue = Number(params.page || 1);
+    const page = Number.isFinite(pageValue) ? Math.max(1, Math.floor(pageValue)) : 1;
+    const html = await requestPage("/" + path, page > 1 ? { page } : {});
+    // 仅缓存首页，避免翻页覆盖演员详情的作品预览。
+    if (page === 1) writeCreatorCache(path, html);
+    const creator = creatorItem(path, html);
+    const works = parseVideoCards(html).map(item => {
+        item.peoples = [{ id: linkForCreator(path), title: creator.title, role: "创作者" }];
+        return item;
+    });
+    if (!works.length && page === 1) throw new Error("未找到该创作者的公开作品");
+    if (params.sortOrder === "random") {
+        for (let index = works.length - 1; index > 0; index -= 1) {
+            const swapIndex = Math.floor(Math.random() * (index + 1));
+            const temporary = works[index];
+            works[index] = works[swapIndex];
+            works[swapIndex] = temporary;
+        }
     }
+    return works;
+}
+
+async function routeCreatorWorks(params) {
+    const path = creatorPathFromPeopleId(params.peopleId);
+    // 非法 peopleId 不能退回首页或预选演员，否则会显示错误作品。
+    if (!path) return [];
+    return loadCreatorWorks(path, params);
+}
+
+async function loadList(params = {}) {
+    if (params.peopleId != null) return routeCreatorWorks(params);
+    const page = Math.max(1, Number(params.page || 1));
     const html = await requestPage("/", page > 1 ? { page } : {});
     const items = parseVideoCards(html);
     if (!items.length) throw new Error("首页未找到视频；站点页面结构可能已变化");
@@ -309,6 +337,8 @@ async function loadList(params = {}) {
 }
 
 async function loadFavorites(params = {}) {
+    if (params.peopleId != null) return routeCreatorWorks(params);
+    if (Number(params.page || 1) > 1) return [];
     const paths = favoriteCreatorPaths(params.favoriteCreators);
     if (!paths.length) throw new Error("请在“收藏创作者”中填写至少一个有效主页路径");
     const results = [];
@@ -326,31 +356,17 @@ async function loadFavorites(params = {}) {
 }
 
 async function loadCreatorWall(params = {}) {
+    if (params.peopleId != null) return routeCreatorWorks(params);
     const path = String(params.creatorPath || "").replace(/^https?:\/\/[^/]+/i, "").replace(/^\/+/, "");
     if (!/^(?:model|pornstar|channels|users)\/[A-Za-z0-9_-]+$/i.test(path)) {
         throw new Error("缺少有效的创作者主页路径");
     }
-    const html = await requestPage("/" + path, {});
-    writeCreatorCache(path, html);
-    const creator = creatorItem(path, html);
-    const items = parseVideoCards(html);
-    if (!items.length) throw new Error("未找到该创作者的公开作品");
-    const works = items.map(item => {
-        item.peoples = [{ id: linkForCreator(path), title: creator.title, role: "创作者" }];
-        return item;
-    });
-    if (params.sortOrder === "random") {
-        for (let index = works.length - 1; index > 0; index -= 1) {
-            const swapIndex = Math.floor(Math.random() * (index + 1));
-            const temporary = works[index];
-            works[index] = works[swapIndex];
-            works[swapIndex] = temporary;
-        }
-    }
-    return works;
+    return loadCreatorWorks(path, params);
 }
 
 async function loadFavoriteUpdates(params = {}) {
+    if (params.peopleId != null) return routeCreatorWorks(params);
+    if (Number(params.page || 1) > 1) return [];
     const paths = favoriteCreatorPaths(params.favoriteCreators);
     if (!paths.length) throw new Error("请在“收藏创作者”中填写至少一个有效主页路径");
     const results = [];
@@ -376,6 +392,7 @@ async function loadFavoriteUpdates(params = {}) {
 }
 
 async function search(params = {}) {
+    if (params.peopleId != null) return routeCreatorWorks(params);
     const keyword = String(params.keyword || "").trim();
     if (!keyword) throw new Error("请输入关键词");
     const html = await requestPage("/video/search", { search: keyword, page: Math.max(1, Number(params.page || 1)) });

@@ -58,6 +58,18 @@ https://cn.pornhub.com/view_video.php?viewkey=...
 - `senplayer-pornhub.js`：HTML 响应注入与 SenPlayer 跳转脚本
 - `senplayer-pornhub-request.js`：SenPlayer MP4 CDN 请求头修正脚本
 
+## Pornhub Widget 演员作品路由
+
+`forward-pornhub.js` 的 `1.1.3` 版本统一处理首页、收藏演员、收藏更新、演员作品墙及搜索入口的 `peopleId`。点击详情页创作者时，返回目标演员的作品，而不是原收藏列表或预选演员。
+
+- 演员作品支持 `page` 翻页；随机排序仅作用于当前页。
+- 非法演员 ID 返回空列表，不请求网站。
+- 普通收藏演员和收藏更新仍为单页聚合，不重复加载第一页。
+- 保留现有 `creator:` 标识，兼容已有条目；不改变播放资源解析。
+- 本地 mock 已覆盖路由与翻页；rex 内演员点击和实播尚未验证。
+
+验证命令：`node test-forward-pornhub.js`。
+
 ## DB Online → Forward
 
 在 Loon 中添加：

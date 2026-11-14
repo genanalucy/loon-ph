@@ -33,6 +33,10 @@ const sandbox = {
         calls.push({ url, options });
         if (url.endsWith("/view_video.php")) return { data: detail };
         if (url.includes("/video/get_media")) return { data: [{ quality: "1080", height: 1080, format: "mp4", videoUrl: "https://cdn.example/1080.mp4" }] };
+        if (url.endsWith("/model/target")) {
+          return { data: Number(options.params.page || 1) > 2 ? "" :
+            '<h1>Target Creator</h1>' + homeCard.replace(/abc123/g, "target456") };
+        }
         if (url.endsWith("/pornstar/alice")) return { data: homeCard };
         return { data: homeCard };
       }
@@ -82,7 +86,7 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
   assert.equal(favorites[0].link, "creator:pornstar/alice");
   assert.equal(favorites[1].link, "creator:model/bob");
 
-  assert.equal(sandbox.WidgetMetadata.version, "1.1.2");
+  assert.equal(sandbox.WidgetMetadata.version, "1.1.3");
   const creatorWallModule = sandbox.WidgetMetadata.modules.find(module => module.id === "loadCreatorWall");
   assert.equal(sandbox.WidgetMetadata.modules.length, 5);
   assert.equal(creatorWallModule.cacheDuration, 0);
@@ -101,5 +105,40 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
   assert.equal(updates[0].peoples[0].id, "creator:pornstar/alice");
   assert.ok(calls.some(call => call.url.endsWith("/pornstar/alice")));
   assert.ok(calls.some(call => call.url.endsWith("/view_video.php") && call.options.params.viewkey === "abc123"));
+  // 每个所属模块都应优先响应 peopleId，不能回到首页、收藏或预选演员。
+  for (const name of ["loadList", "loadFavorites", "loadFavoriteUpdates", "loadCreatorWall", "search"]) {
+    const before = calls.length;
+    const works = await sandbox[name]({
+      peopleId: "creator:model/target", page: 2,
+      creatorPath: "/pornstar/alice", favoriteCreators: "/model/bob", keyword: "unrelated"
+    });
+    assert.equal(calls.length, before + 1, name + " 应只请求目标演员");
+    assert.equal(calls[before].url, "https://www.pornhub.com/model/target");
+    assert.equal(calls[before].options.params.page, 2);
+    assert.equal(works[0].link, "video:target456");
+    assert.equal(works[0].peoples[0].id, "creator:model/target");
+    assert.equal(works[0].peoples[0].title, "Target Creator");
+    for (const peopleId of ["", "creator:../admin", "creator:model/target?x=1",
+      "creator:https://evil.test/model/target", "other:model/target"]) {
+      const count = calls.length;
+      assert.equal((await sandbox[name]({ peopleId })).length, 0);
+      assert.equal(calls.length, count, name + " 非法演员不应发起请求");
+    }
+    assert.equal((await sandbox[name]({ peopleId: "creator:model/target", page: 3 })).length, 0);
+  }
+  const wallPage = await sandbox.loadCreatorWall({ creatorPath: "/model/target", page: 2 });
+  assert.equal(wallPage[0].link, "video:target456");
+  assert.equal(calls[calls.length - 1].options.params.page, 2);
+  for (const id of ["loadList", "loadFavorites", "loadFavoriteUpdates", "loadCreatorWall"]) {
+    assert.ok(sandbox.WidgetMetadata.modules.find(module => module.id === id)
+      .params.some(param => param.name === "page" && param.type === "page"));
+  }
+  const beforeExhausted = calls.length;
+  assert.equal((await sandbox.loadFavorites({ page: 2 })).length, 0);
+  assert.equal((await sandbox.loadFavoriteUpdates({ page: 2 })).length, 0);
+  assert.equal(calls.length, beforeExhausted, "普通收藏列表不能重复加载第一页");
+  sandbox.Widget.storage.set("creator-page:model/target", "first-page-cache");
+  await sandbox.loadCreatorWall({ creatorPath: "/model/target", page: 2 });
+  assert.equal(sandbox.Widget.storage.get("creator-page:model/target"), "first-page-cache");
   console.log("✅ Forward Pornhub mock test passed", { calls: calls.length });
 })().catch(error => { console.error("❌", error); process.exit(1); });
