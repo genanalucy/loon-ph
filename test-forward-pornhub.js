@@ -3,6 +3,7 @@ const fs = require("fs");
 const vm = require("vm");
 
 const homeCard = `
+<img id="getAvatar" src="//img.example/avatar.jpg">
 <div class="positionRelative videoWrapper js-video-element">
   <a class="imageLink" href="/view_video.php?viewkey=abc123" data-poster="https://img.example/home.jpg"><img class="videoThumb" src="https://img.example/home.jpg"></a>
   <div class="duration"><span class="bgEffect time">12:34</span></div>
@@ -72,13 +73,21 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
 
   const creatorDetail = await sandbox.loadDetail("creator:pornstar/alice");
   assert.equal(creatorDetail.link, "creator:pornstar/alice");
-  assert.equal(creatorDetail.relatedItems.length, 1);
-  assert.equal(creatorDetail.relatedItems[0].link, "video:abc123");
+  assert.equal(creatorDetail.mediaType, "tv");
+  assert.equal(creatorDetail.posterPath, "https://img.example/avatar.jpg");
+  assert.equal(creatorDetail.relatedItems, undefined);
+  assert.equal(creatorDetail.episodeItems.length, 1);
+  assert.equal(creatorDetail.episodeItems[0].link, "video:abc123");
+  assert.equal(creatorDetail.episodeItems[0].episode, 1);
+  assert.equal(creatorDetail.episodeItems[0].playerType, "app");
+  const episodeResources = await sandbox.loadResource(creatorDetail.episodeItems[0]);
+  assert.equal(episodeResources[0].url, "https://cdn.example/1080.mp4");
+  assert.equal(calls[calls.length - 2].options.params.viewkey, "abc123");
 
   sandbox.Widget.storage.set("creator-page:model/creator-cache", homeCard);
   const callsBeforeCachedDetail = calls.length;
   const cachedCreatorDetail = await sandbox.loadDetail("creator:model/creator-cache");
-  assert.equal(cachedCreatorDetail.relatedItems[0].link, "video:abc123");
+  assert.equal(cachedCreatorDetail.episodeItems[0].link, "video:abc123");
   assert.equal(calls.length, callsBeforeCachedDetail);
 
   const favorites = await sandbox.loadFavorites({ favoriteCreators: "https://www.pornhub.com/pornstar/alice\n/model/bob\ninvalid" });
@@ -86,7 +95,7 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
   assert.equal(favorites[0].link, "creator:pornstar/alice");
   assert.equal(favorites[1].link, "creator:model/bob");
 
-  assert.equal(sandbox.WidgetMetadata.version, "1.1.4");
+  assert.equal(sandbox.WidgetMetadata.version, "1.1.5");
   const creatorWallModule = sandbox.WidgetMetadata.modules.find(module => module.id === "loadCreatorWall");
   assert.equal(sandbox.WidgetMetadata.modules.length, 6);
   assert.equal(creatorWallModule.cacheDuration, 0);
@@ -148,10 +157,19 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
   assert.equal(hubDetail.peoples.length, 2);
   assert.equal(hubDetail.peoples[0].id, "creator:model/target");
   assert.equal(hubDetail.peoples[0].title, "Target Creator");
-  assert.equal(hubDetail.peoples[0].avatar, "https://img.example/home.jpg");
+  assert.equal(hubDetail.peoples[0].avatar, "https://img.example/avatar.jpg");
   assert.equal(hubDetail.childItems, undefined);
   const hubWorks = await sandbox.loadPopularPeople({ peopleId: hubDetail.peoples[0].id });
   assert.equal(hubWorks[0].link, "video:target456");
+  sandbox.Widget.storage.set("creator-page:model/series", homeCard + homeCard.replace(/abc123/g, "episode2"));
+  const series = await sandbox.loadDetail("creator:model/series");
+  assert.equal(series.episodeItems.length, 2);
+  assert.equal(series.episodeItems[1].episode, 2);
+  assert.equal(series.episodeItems[1].link, "video:episode2");
+  const episodeCount = calls.length;
+  await sandbox.loadResource(series.episodeItems[1]);
+  assert.equal(calls[episodeCount].options.params.viewkey, "episode2");
+  assert.equal(sandbox.creatorItem("model/no-avatar", '<img src="https://img.test/video.jpg">').coverUrl, "");
   const beforeBadHub = calls.length;
   for (const link of ["ph-people:%", "ph-people:", "ph-people:" + encodeURIComponent("../bad")]) {
     assert.equal(await sandbox.loadDetail(link), null);

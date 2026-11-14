@@ -1,7 +1,7 @@
 WidgetMetadata = {
     id: "forward.pornhub",
     title: "Pornhub",
-    version: "1.1.4",
+    version: "1.1.5",
     requiredVersion: "0.0.1",
     description: "Pornhub 公开热门、搜索、播放、相关推荐与创作者作品",
     author: "genanalucy",
@@ -109,6 +109,7 @@ function phHeaders() {
 function absoluteUrl(value) {
     if (!value) return "";
     if (/^https?:\/\//i.test(value)) return value;
+    if (value.indexOf("//") === 0) return "https:" + value;
     return PH_ORIGIN + (value.charAt(0) === "/" ? value : "/" + value);
 }
 
@@ -172,14 +173,23 @@ function writeCreatorCache(path, html) {
 function creatorItem(path, html) {
     const titleMatch = String(html || "").match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i) ||
         String(html || "").match(/<title[^>]*>\s*([^<|]+?)(?:\s*[|-]|<)/i);
-    const imageMatch = String(html || "").match(/<meta\b[^>]*property\s*=\s*["']og:image["'][^>]*content\s*=\s*["']([^"']+)/i) ||
-        String(html || "").match(/<(?:img)\b[^>]*(?:data-avatar|src)\s*=\s*["']([^"']+)["'][^>]*(?:class\s*=\s*["'][^"']*(?:avatar|profile)[^"']*["'])?/i);
+    const images = String(html || "").match(/<img\b[^>]*>/gi) || [];
+    const avatar = images.find(tag => /^(?:getAvatar|avatarPicture|profileImage|profilePicture)$/i.test(attrValue(tag, "id")));
+    const metas = String(html || "").match(/<meta\b[^>]*>/gi) || [];
+    const ogImage = metas.find(tag => attrValue(tag, "property").toLowerCase() === "og:image");
+    const portrait = absoluteUrl(avatar
+        ? attrValue(avatar, "data-src") || attrValue(avatar, "src")
+        : ogImage ? attrValue(ogImage, "content") : "");
     return {
         id: linkForCreator(path),
         type: "url",
         title: cleanText(titleMatch && titleMatch[1]) || creatorTitleFromPath(path),
-        coverUrl: absoluteUrl(imageMatch && imageMatch[1]),
-        description: "已收藏创作者",
+        mediaType: "tv",
+        coverUrl: portrait,
+        posterPath: portrait,
+        backdropPath: portrait,
+        headers: phHeaders(),
+        description: "演员作品集 · 点击查看分集影片",
         link: linkForCreator(path)
     };
 }
@@ -450,10 +460,12 @@ async function loadDetail(link) {
         }
         const creator = creatorItem(path, html);
         return Object.assign(creator, {
-            relatedItems: parseVideoCards(html).map(item => {
-                item.peoples = [{ id: linkForCreator(path), title: creator.title, role: "创作者" }];
-                return item;
-            })
+            episodeItems: parseVideoCards(html).map((item, index) => Object.assign({}, item, {
+                mediaType: "tv",
+                episode: index + 1,
+                playerType: "app",
+                peoples: [{ id: linkForCreator(path), title: creator.title, avatar: creator.coverUrl, role: "创作者" }]
+            }))
         });
     }
     if (value.indexOf("video:") !== 0) return null;
