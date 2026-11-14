@@ -54,6 +54,8 @@ vm.runInContext(fs.readFileSync('forward-pornhub.js', 'utf8'), c);
     for (const name of ['loadFavoriteUpdates', 'loadRecommended']) {
         const videos = await c[name]({ page: 2 });
         assert.equal(videos[0].link, 'video:account123');
+        assert.equal(videos[0].headers.Referer, 'https://www.pornhub.com/');
+        assert.equal(videos[0].headers.Cookie, undefined);
         assert.equal(calls[calls.length - 1].options.params.page, 2);
     }
     for (const call of calls) {
@@ -80,7 +82,7 @@ vm.runInContext(fs.readFileSync('forward-pornhub.js', 'utf8'), c);
     }
     assert.equal(c.accountContent('<div class="subscriptionsVideosWrapper mobile"><ul class="videoList"></ul></div>', false, '/subscriptions'), '<ul class="videoList"></ul>');
     assert.throws(() => c.accountContent('<div class="subscriptionsVideosWrapper mobile"><ul class="videoList">' + card + '</ul></div>', false, '/recommended'), /结构未识别/);
-    assert.equal(c.WidgetMetadata.version, '1.2.5');
+    assert.equal(c.WidgetMetadata.version, '1.2.6');
     const favoritesModule = c.WidgetMetadata.modules.find(module => module.id === 'loadFavorites');
     const sortParam = favoritesModule.params.find(param => param.name === 'sortOrder');
     assert.equal(sortParam.value, 'original');
@@ -105,7 +107,9 @@ vm.runInContext(fs.readFileSync('forward-pornhub.js', 'utf8'), c);
     assert.equal(injected.headers['User-Agent'], desktopRequest.options.headers['User-Agent']);
     assert.equal(injected.headers.Cookie, 'sessid=mock-a; ss=mock-b');
     assert.equal(injected.headers['X-PH-Widget-Auth'], undefined);
-    const cacheStore = {};
+    const cacheStore = {
+        'ph-account-items:v1:cached:actors:1': JSON.stringify({ savedAt: Date.now(), items: [{ link: 'stale-cover' }] })
+    };
     c.Widget.storage = { get: key => cacheStore[key], set: (key, value) => { cacheStore[key] = value; } };
     actorCount = 3;
     const cacheStart = calls.length;
@@ -119,7 +123,7 @@ vm.runInContext(fs.readFileSync('forward-pornhub.js', 'utf8'), c);
     await c.loadFavorites({ accountUsername: 'another' });
     await c.loadFavorites({ accountUsername: 'cached', forceRefresh: 'refresh' });
     assert.equal(calls.length, cacheStart + 4);
-    const actorKey = Object.keys(cacheStore).find(key => key.includes(':cached:actors:1'));
+    const actorKey = Object.keys(cacheStore).find(key => key.startsWith('ph-account-items:v2:') && key.includes(':cached:actors:1'));
     const expired = JSON.parse(cacheStore[actorKey]);
     expired.savedAt = Date.now() - 7 * 60 * 60 * 1000;
     cacheStore[actorKey] = JSON.stringify(expired);

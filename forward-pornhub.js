@@ -1,7 +1,7 @@
 WidgetMetadata = {
     id: "forward.pornhub",
     title: "Pornhub",
-    version: "1.2.5",
+    version: "1.2.6",
     requiredVersion: "0.0.1",
     description: "Pornhub 公开热门、搜索、播放、相关推荐与创作者作品",
     author: "genanalucy",
@@ -145,8 +145,14 @@ function cleanText(value) {
 }
 
 function attrValue(html, name) {
-    const match = String(html || "").match(new RegExp("\\b" + name + "\\s*=\\s*[\\\"']([^\\\"']*)", "i"));
-    return match ? cleanText(match[1]) : "";
+    // 逐个读取完整属性名，src 不能命中 data-src，id 不能命中 data-id。
+    const pattern = /(?:^|\s)([^\s=<>]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g;
+    let match;
+    while ((match = pattern.exec(String(html || "")))) {
+        if (match[1].toLowerCase() !== String(name).toLowerCase()) continue;
+        return cleanText(match[2] !== undefined ? match[2] : match[3] !== undefined ? match[3] : match[4]);
+    }
+    return "";
 }
 
 function viewKeyFromUrl(url) {
@@ -222,8 +228,11 @@ function videoCoverFromCard(card) {
     const links = String(card).match(/<a\b[^>]*>[\s\S]*?<\/a>/gi) || [];
     const videoLink = links.find(tag => /view_video\.php\?viewkey=/.test(attrValue(tag, "href")) && /<img\b/i.test(tag));
     const images = String(videoLink || card).match(/<img\b[^>]*>/gi) || [];
+    // 部分竖屏卡片把 poster 放在链接或容器上，而不是 img。
+    const posters = String(card).match(/<[^/!][^>]*\sdata-(?:poster|mediumthumb|image)\s*=[^>]*>/gi) || [];
+    const nodes = images.concat(videoLink ? [videoLink.slice(0, videoLink.indexOf(">") + 1)] : [], posters);
     for (const name of ["data-mediumthumb", "data-image", "data-poster", "data-src", "src"]) {
-        for (const image of images) {
+        for (const image of nodes) {
             const value = attrValue(image, name);
             if (!value || /^(?:data|javascript):/i.test(value) || /\.(?:webm|mp4|m3u8|js)(?:[?#]|$)/i.test(value)) continue;
             if (/(?:^|[\/_-])(?:placeholder|transparent|blank)(?:[\/_.-]|$)/i.test(value)) continue;
@@ -258,6 +267,7 @@ function videoItemFromCard(card) {
         type: "url",
         title,
         coverUrl: videoCoverFromCard(card),
+        headers: phHeaders(),
         durationText: cleanText(durationMatch && durationMatch[1]),
         description: cleanText(viewMatch && viewMatch[1]),
         link: linkForVideo(key),
@@ -334,7 +344,8 @@ function relatedItemsFromPage(html) {
                 id: key,
                 type: "url",
                 title: cleanText(row[1]),
-                coverUrl: row[10] && row[10].highResThumb ? row[10].highResThumb : row[0],
+                coverUrl: absoluteUrl(row[10] && row[10].highResThumb ? row[10].highResThumb : row[0]),
+                headers: phHeaders(),
                 durationText: cleanText(row[2]),
                 description: row[5] ? String(row[5]) + " views" : "",
                 link: linkForVideo(key),
@@ -483,7 +494,7 @@ function accountContent(html, actors, path) {
 async function cachedAccountItems(kind, params, ttl, loader) {
     const username = String(params.accountUsername || "genanalucy").trim();
     if (!/^[A-Za-z0-9_-]+$/.test(username)) throw new Error("用户名格式无效");
-    const key = "ph-account-items:v1:" + username.toLowerCase() + ":" + kind + ":" + accountPageNumber(params);
+    const key = "ph-account-items:v2:" + username.toLowerCase() + ":" + kind + ":" + accountPageNumber(params);
     const storage = Widget.storage;
     if (params.forceRefresh !== "refresh" && storage && typeof storage.get === "function") {
         try {
@@ -737,7 +748,8 @@ async function loadDetail(link) {
         id: key,
         type: "url",
         title: cleanText(video.videoTitle || flashvars.video_title || "Pornhub Video"),
-        coverUrl: video.videoImage || flashvars.image_url || flashvars.poster_url || "",
+        coverUrl: absoluteUrl(video.videoImage || flashvars.image_url || flashvars.poster_url || ""),
+        headers: phHeaders(),
         description: "",
         duration: Number(flashvars.video_duration || 0) || undefined,
         link: linkForVideo(key),

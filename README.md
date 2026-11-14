@@ -58,7 +58,11 @@ https://cn.pornhub.com/view_video.php?viewkey=...
 - `senplayer-pornhub.js`：HTML 响应注入与 SenPlayer 跳转脚本
 - `senplayer-pornhub-request.js`：SenPlayer MP4 CDN 请求头修正脚本
 
-## Pornhub 账号内容与 Loon 登录桥接（1.2.5）
+## Pornhub 账号内容与 Loon 登录桥接（1.2.6）
+
+`1.2.6` 修复公共 HTML 属性的完整名称匹配，避免 `src` 命中 `data-src`、`id` 命中 `data-id`；视频封面兼容链接或容器上的 `data-poster`（包含竖屏卡片的候选结构）。视频列表、分集沿用项、相关推荐与视频详情补充不含 Cookie 的图片 UA/Referer。完整保留签名及 `.mp4/plain/...` 截帧地址，未增加图片逐张探测，也未更改播放头。关注列表缓存命名升级为 v2，首次加载重新获取；其他缓存策略不变。
+
+本地测试覆盖属性冲突、空图候选回退、签名截帧和图片头，账号及原有回归测试通过。用户日志中的空封面没有对应 HTML，容器 poster 兜底尚不能证明覆盖该具体卡片；非空 URL 的 CDN 状态及客户端解码也尚未验证，不保证本次消除所有坏图。演员主页 HTML 旧缓存仍保留，图片签名过期时可能需要重新获取主页。
 
 `1.2.5` 小修公共解析：列表封面优先从视频链接内图片按 `data-mediumthumb / data-image / data-poster / data-src / src` 提取，排除视频、内联数据和常见占位图；清晰度兼容数组与 `720p` 文本，多档 HLS 标记为自适应最高档位；页面请求识别明确验证页、空响应与 HTTP 错误。未改账号桥接、缓存 TTL、分集或取链流程。已有关注缓存中的图片需过期或强刷后更新。离线边界和回归测试通过，客户端图片及播放效果待确认。
 
