@@ -1,7 +1,7 @@
 WidgetMetadata = {
     id: "forward.pornhub",
     title: "Pornhub",
-    version: "1.1.5",
+    version: "1.1.6",
     requiredVersion: "0.0.1",
     description: "Pornhub 公开热门、搜索、播放、相关推荐与创作者作品",
     author: "genanalucy",
@@ -440,6 +440,50 @@ async function search(params = {}) {
     return parseVideoCards(html);
 }
 
+function creatorSeasonItem(creator, path, season) {
+    const link = "ph-season:" + season + ":" + path;
+    return Object.assign({}, creator, {
+        id: link, link,
+        title: creator.title + " · 第 " + season + " 季",
+        description: "每季最多 20 集，按演员主页顺序分组；新片发布可能改变分组。"
+    });
+}
+
+async function creatorSeasonDetail(path, season) {
+    let html = readCreatorCache(path);
+    if (!html) {
+        html = await requestPage("/" + path, {});
+        writeCreatorCache(path, html);
+    }
+    const creator = creatorItem(path, html);
+    const start = (season - 1) * 20;
+    const videos = [];
+    const seen = {};
+    // 按真实页面累积，不能假定网站每页永远恰好有 20 部。
+    for (let page = 1; page <= 100; page += 1) {
+        const pageHtml = page === 1 ? html : await requestPage("/" + path, { page });
+        const items = parseVideoCards(pageHtml);
+        let added = 0;
+        for (const item of items) {
+            if (seen[item.id]) continue;
+            seen[item.id] = true;
+            videos.push(item);
+            added += 1;
+        }
+        if (!added || videos.length > start + 20) break;
+    }
+    const item = creatorSeasonItem(creator, path, season);
+    item.episodeItems = videos.slice(start, start + 20).map((video, index) => Object.assign({}, video, {
+        mediaType: "tv", season, episode: index + 1, playerType: "app",
+        peoples: [{ id: linkForCreator(path), title: creator.title, avatar: creator.coverUrl, role: "创作者" }]
+    }));
+    item.relatedItems = [];
+    if (season > 1) item.relatedItems.push(creatorSeasonItem(creator, path, season - 1));
+    if (season < 100 && videos.length > start + 20) item.relatedItems.push(creatorSeasonItem(creator, path, season + 1));
+    if (!item.episodeItems.length) item.description = "该季暂无影片，请返回上一季。";
+    return item;
+}
+
 async function loadDetail(link) {
     const value = String(link || "");
     if (value.indexOf("ph-people:") === 0) {
@@ -449,6 +493,11 @@ async function loadDetail(link) {
         const paths = favoriteCreatorPaths(raw);
         if (!paths.length || paths.join("\n") !== raw) return null;
         return peopleHubItem(paths);
+    }
+    if (value.indexOf("ph-season:") === 0) {
+        const match = value.match(/^ph-season:([1-9][0-9]*):((?:model|pornstar|channels|users)\/[A-Za-z0-9_-]+)$/i);
+        if (!match || Number(match[1]) > 100) return null;
+        return creatorSeasonDetail(match[2], Number(match[1]));
     }
     if (value.indexOf("creator:") === 0) {
         const path = value.slice("creator:".length).replace(/^\/+/, "");
@@ -460,12 +509,8 @@ async function loadDetail(link) {
         }
         const creator = creatorItem(path, html);
         return Object.assign(creator, {
-            episodeItems: parseVideoCards(html).map((item, index) => Object.assign({}, item, {
-                mediaType: "tv",
-                episode: index + 1,
-                playerType: "app",
-                peoples: [{ id: linkForCreator(path), title: creator.title, avatar: creator.coverUrl, role: "创作者" }]
-            }))
+            description: "打开第 1 季查看影片，每 20 集分为一季；季详情底部可进入下一季。",
+            relatedItems: [creatorSeasonItem(creator, path, 1)]
         });
     }
     if (value.indexOf("video:") !== 0) return null;
