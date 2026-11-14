@@ -58,7 +58,9 @@ https://cn.pornhub.com/view_video.php?viewkey=...
 - `senplayer-pornhub.js`：HTML 响应注入与 SenPlayer 跳转脚本
 - `senplayer-pornhub-request.js`：SenPlayer MP4 CDN 请求头修正脚本
 
-## Pornhub 账号内容与 Loon 登录桥接（1.2.1，待真机验证）
+## Pornhub 账号内容与 Loon 登录桥接（1.2.2，待真机验证）
+
+`1.2.2` 仅对 `/users/:username/subscriptions` 人物列表请求使用桌面 Chrome User-Agent，尝试获取电脑版人物布局；关注更新、个性化推荐与播放请求仍使用原 UA。保留 Loon 登录注入与登录检测，不改变 Cookie 存储。请求头隔离与桥接兼容性 mock 已通过，但桌面 UA 不保证站点一定返回 `profileContentLeft`；登录后人物页面结构和客户端列表仍待真机确认。
 
 `1.2.1` 修复手机账号视频列表：分别限定在 `subscriptionsVideosWrapper` / `recommendedVideosContainer` 内解析 `ul.videoList`，保留电脑版列表 ID 支持。移除过于宽泛的 `main` 兜底，防止无关视频混入。手机/桌面 mock、导航隔离和公开真实手机 HTML 的容器提取已验证；真实页面样本未登录，仅证明解析结构，不证明账号内容或登录桥接可用。Loon 桥接脚本无改动。
 

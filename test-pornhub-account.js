@@ -57,6 +57,12 @@ vm.runInContext(fs.readFileSync('forward-pornhub.js', 'utf8'), c);
         assert.ok(call.target.startsWith('https://cn.pornhub.com/'));
         assert.equal(call.options.headers['X-PH-Widget-Auth'], '1');
         assert.equal(call.options.headers.Cookie, undefined);
+        if (call.target.includes('/users/')) {
+            assert.ok(call.options.headers['User-Agent'].includes('Windows NT'));
+            assert.ok(!call.options.headers['User-Agent'].includes('iPhone'));
+        } else {
+            assert.ok(call.options.headers['User-Agent'].includes('iPhone'));
+        }
     }
     mobile = true;
     for (const name of ['loadFavoriteUpdates', 'loadRecommended']) {
@@ -71,7 +77,14 @@ vm.runInContext(fs.readFileSync('forward-pornhub.js', 'utf8'), c);
     }
     assert.equal(c.accountContent('<div class="subscriptionsVideosWrapper mobile"><ul class="videoList"></ul></div>', false, '/subscriptions'), '<ul class="videoList"></ul>');
     assert.throws(() => c.accountContent('<div class="subscriptionsVideosWrapper mobile"><ul class="videoList">' + card + '</ul></div>', false, '/recommended'), /结构未识别/);
-    assert.equal(c.WidgetMetadata.version, '1.2.1');
+    assert.equal(c.WidgetMetadata.version, '1.2.2');
+    const publicHeaders = c.phHeaders();
+    assert.ok(publicHeaders['User-Agent'].includes('iPhone'), '桌面请求不能污染其他请求头');
+    const desktopRequest = calls.find(call => call.target.includes('/users/'));
+    const injected = run({ url: desktopRequest.target, headers: desktopRequest.options.headers });
+    assert.equal(injected.headers['User-Agent'], desktopRequest.options.headers['User-Agent']);
+    assert.equal(injected.headers.Cookie, 'sessid=mock-a; ss=mock-b');
+    assert.equal(injected.headers['X-PH-Widget-Auth'], undefined);
     logged = false;
     await assert.rejects(c.loadRecommended({}), /登录状态/);
     await assert.rejects(c.loadFavorites({ accountUsername: '../bad' }), /用户名格式/);

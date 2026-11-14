@@ -1,7 +1,7 @@
 WidgetMetadata = {
     id: "forward.pornhub",
     title: "Pornhub",
-    version: "1.2.1",
+    version: "1.2.2",
     requiredVersion: "0.0.1",
     description: "Pornhub 公开热门、搜索、播放、相关推荐与创作者作品",
     author: "genanalucy",
@@ -373,8 +373,13 @@ function accountPageNumber(params) {
 }
 
 async function requestAccountPage(path, params) {
+    const headers = Object.assign(phHeaders(), { Referer: "https://cn.pornhub.com/", "X-PH-Widget-Auth": "1" });
+    // 人物订阅页使用桌面布局；视频流与媒体请求继续使用原手机 UA。
+    if (/^\/users\/[A-Za-z0-9_-]+\/subscriptions$/.test(path)) {
+        headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+    }
     const response = await Widget.http.get("https://cn.pornhub.com" + path, {
-        headers: Object.assign(phHeaders(), { Referer: "https://cn.pornhub.com/", "X-PH-Widget-Auth": "1" }),
+        headers,
         params: { page: accountPageNumber(params) }
     });
     const html = response && response.data;
