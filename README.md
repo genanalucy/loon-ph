@@ -58,7 +58,9 @@ https://cn.pornhub.com/view_video.php?viewkey=...
 - `senplayer-pornhub.js`：HTML 响应注入与 SenPlayer 跳转脚本
 - `senplayer-pornhub-request.js`：SenPlayer MP4 CDN 请求头修正脚本
 
-## Pornhub 账号内容与 Loon 登录桥接（1.2.2，待真机验证）
+## Pornhub 账号内容与 Loon 登录桥接（1.2.3）
+
+`1.2.3` 为“我的关注”新增“演员排序”：默认“原顺序”，可选“随机排序（当前页）”。仅打乱本次加载的演员卡片，不额外请求其他页面，不改变演员详情和播放逻辑。刷新重新加载时重新随机，随机结果可能与上次相同。离线测试覆盖顺序、元素完整性、单演员和请求数量；客户端排序选项显示仍待确认。
 
 `1.2.2` 仅对 `/users/:username/subscriptions` 人物列表请求使用桌面 Chrome User-Agent，尝试获取电脑版人物布局；关注更新、个性化推荐与播放请求仍使用原 UA。保留 Loon 登录注入与登录检测，不改变 Cookie 存储。请求头隔离与桥接兼容性 mock 已通过，但桌面 UA 不保证站点一定返回 `profileContentLeft`；登录后人物页面结构和客户端列表仍待真机确认。
 

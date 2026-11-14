@@ -1,7 +1,7 @@
 WidgetMetadata = {
     id: "forward.pornhub",
     title: "Pornhub",
-    version: "1.2.2",
+    version: "1.2.3",
     requiredVersion: "0.0.1",
     description: "Pornhub 公开热门、搜索、播放、相关推荐与创作者作品",
     author: "genanalucy",
@@ -31,7 +31,14 @@ WidgetMetadata = {
             title: "我的关注",
             functionName: "loadFavorites",
             cacheDuration: 0,
-            params: [{ name: "page", title: "页码", type: "page" }]
+            params: [
+                { name: "sortOrder", title: "演员排序", type: "enumeration", value: "original",
+                  enumOptions: [
+                      { title: "原顺序", value: "original" },
+                      { title: "随机排序（当前页）", value: "random" }
+                  ] },
+                { name: "page", title: "页码", type: "page" }
+            ]
         },
         {
             id: "loadRecommended", title: "个性化推荐", functionName: "loadRecommended",
@@ -463,6 +470,14 @@ async function loadFavorites(params = {}) {
         items.push(item);
     }
     if (!items.length && accountPageNumber(params) === 1) throw new Error("未解析到订阅人物；请确认账号有关注，或提供登录后的人物页面抓包");
+    if (params.sortOrder === "random") {
+        for (let index = items.length - 1; index > 0; index -= 1) {
+            const swapIndex = Math.floor(Math.random() * (index + 1));
+            const temporary = items[index];
+            items[index] = items[swapIndex];
+            items[swapIndex] = temporary;
+        }
+    }
     return items;
 }
 

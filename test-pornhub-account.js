@@ -29,11 +29,14 @@ for (const badUrl of ['https://cn.pornhub.com.evil.test/recommended', 'https://c
 const calls = [];
 let logged = true;
 let mobile = false;
+let actorCount = 1;
 const card = '<li class="pcVideoListItem"><a href="/view_video.php?viewkey=account123">Account Video</a></li>';
 const c = { console, Widget: { http: { async get(target, options) {
     calls.push({ target, options });
     const signal = 'var isLoggedInUser = ' + Number(logged) + ';';
-    if (target.includes('/users/')) return { data: signal + '<div class="profileContentLeft"><a href="/model/example"><img src="//img.test/actor.jpg" alt="Example"></a><a href="https://evil.test/model/no">Wrong</a></div><div class="profileContentRight">' };
+    if (target.includes('/users/')) return { data: signal + '<div class="profileContentLeft">' +
+        Array.from({ length: actorCount }, (_, i) => '<a href="/model/example' + (i || '') + '"><img src="//img.test/actor.jpg" alt="Example"></a>').join('') +
+        '<a href="https://evil.test/model/no">Wrong</a></div><div class="profileContentRight">' };
     if (mobile) {
         const wrapper = target.endsWith('/recommended') ? 'recommendedVideosContainer' : 'subscriptionsVideosWrapper mobile';
         return { data: signal + '<header><ul class="videoList">' + card.replace(/account123/g, 'navWrong') + '</ul></header>' +
@@ -77,7 +80,24 @@ vm.runInContext(fs.readFileSync('forward-pornhub.js', 'utf8'), c);
     }
     assert.equal(c.accountContent('<div class="subscriptionsVideosWrapper mobile"><ul class="videoList"></ul></div>', false, '/subscriptions'), '<ul class="videoList"></ul>');
     assert.throws(() => c.accountContent('<div class="subscriptionsVideosWrapper mobile"><ul class="videoList">' + card + '</ul></div>', false, '/recommended'), /结构未识别/);
-    assert.equal(c.WidgetMetadata.version, '1.2.2');
+    assert.equal(c.WidgetMetadata.version, '1.2.3');
+    const favoritesModule = c.WidgetMetadata.modules.find(module => module.id === 'loadFavorites');
+    const sortParam = favoritesModule.params.find(param => param.name === 'sortOrder');
+    assert.equal(sortParam.value, 'original');
+    assert.equal(sortParam.enumOptions[1].value, 'random');
+    assert.equal(favoritesModule.cacheDuration, 0);
+    actorCount = 3;
+    vm.runInContext('Math.random = () => 0;', c);
+    const beforeSort = calls.length;
+    const original = await c.loadFavorites({ accountUsername: 'example', page: 2 });
+    const shuffled = await c.loadFavorites({ accountUsername: 'example', page: 2, sortOrder: 'random' });
+    assert.deepEqual(Array.from(original, item => item.link), ['creator:model/example', 'creator:model/example1', 'creator:model/example2']);
+    assert.deepEqual(Array.from(shuffled, item => item.link), ['creator:model/example1', 'creator:model/example2', 'creator:model/example']);
+    assert.deepEqual(Array.from(shuffled, item => item.link).sort(), Array.from(original, item => item.link).sort());
+    assert.equal(calls.length - beforeSort, 2, '随机排序不能额外抓取其他页');
+    assert.equal(calls[calls.length - 1].options.params.page, 2);
+    actorCount = 1;
+    assert.equal((await c.loadFavorites({ sortOrder: 'random' })).length, 1);
     const publicHeaders = c.phHeaders();
     assert.ok(publicHeaders['User-Agent'].includes('iPhone'), '桌面请求不能污染其他请求头');
     const desktopRequest = calls.find(call => call.target.includes('/users/'));
