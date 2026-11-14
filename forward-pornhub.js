@@ -1,7 +1,7 @@
 WidgetMetadata = {
     id: "forward.pornhub",
     title: "Pornhub",
-    version: "1.1.3",
+    version: "1.1.4",
     requiredVersion: "0.0.1",
     description: "Pornhub 公开热门、搜索、播放、相关推荐与创作者作品",
     author: "genanalucy",
@@ -29,6 +29,13 @@ WidgetMetadata = {
             title: "收藏演员",
             functionName: "loadFavorites",
             cacheDuration: 300,
+            params: [{ name: "page", title: "页码", type: "page" }]
+        },
+        {
+            id: "loadPopularPeople",
+            title: "热门人物（实验）",
+            functionName: "loadPopularPeople",
+            cacheDuration: 0,
             params: [{ name: "page", title: "页码", type: "page" }]
         },
         {
@@ -355,6 +362,30 @@ async function loadFavorites(params = {}) {
     return results;
 }
 
+function peopleHubItem(paths) {
+    const peoples = paths.map(path => {
+        const creator = creatorItem(path, readCreatorCache(path));
+        return { id: creator.link, title: creator.title, avatar: creator.coverUrl, role: "创作者" };
+    });
+    return {
+        id: "ph-people-hub",
+        type: "url",
+        title: "热门人物（收藏演员）",
+        coverUrl: peoples.length ? peoples[0].avatar : "",
+        description: "实验入口：打开后点击人物头像查看作品；不是首页原生热门人物数据源。",
+        link: "ph-people:" + encodeURIComponent(paths.join("\n")),
+        peoples
+    };
+}
+
+async function loadPopularPeople(params = {}) {
+    if (params.peopleId != null) return routeCreatorWorks(params);
+    if (Number(params.page || 1) > 1) return [];
+    // 复用收藏加载以获取姓名和头像，并将首页写入现有缓存。
+    await loadFavorites(params);
+    return [peopleHubItem(favoriteCreatorPaths(params.favoriteCreators))];
+}
+
 async function loadCreatorWall(params = {}) {
     if (params.peopleId != null) return routeCreatorWorks(params);
     const path = String(params.creatorPath || "").replace(/^https?:\/\/[^/]+/i, "").replace(/^\/+/, "");
@@ -401,6 +432,14 @@ async function search(params = {}) {
 
 async function loadDetail(link) {
     const value = String(link || "");
+    if (value.indexOf("ph-people:") === 0) {
+        let raw;
+        try { raw = decodeURIComponent(value.slice("ph-people:".length)); }
+        catch (_) { return null; }
+        const paths = favoriteCreatorPaths(raw);
+        if (!paths.length || paths.join("\n") !== raw) return null;
+        return peopleHubItem(paths);
+    }
     if (value.indexOf("creator:") === 0) {
         const path = value.slice("creator:".length).replace(/^\/+/, "");
         if (!/^(?:model|pornstar|channels|users)\/[A-Za-z0-9_-]+$/i.test(path)) return null;

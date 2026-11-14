@@ -86,9 +86,9 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
   assert.equal(favorites[0].link, "creator:pornstar/alice");
   assert.equal(favorites[1].link, "creator:model/bob");
 
-  assert.equal(sandbox.WidgetMetadata.version, "1.1.3");
+  assert.equal(sandbox.WidgetMetadata.version, "1.1.4");
   const creatorWallModule = sandbox.WidgetMetadata.modules.find(module => module.id === "loadCreatorWall");
-  assert.equal(sandbox.WidgetMetadata.modules.length, 5);
+  assert.equal(sandbox.WidgetMetadata.modules.length, 6);
   assert.equal(creatorWallModule.cacheDuration, 0);
   assert.equal(creatorWallModule.params[0].type, "enumeration");
   assert.equal(creatorWallModule.params[0].enumOptions.length, 12);
@@ -106,7 +106,7 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
   assert.ok(calls.some(call => call.url.endsWith("/pornstar/alice")));
   assert.ok(calls.some(call => call.url.endsWith("/view_video.php") && call.options.params.viewkey === "abc123"));
   // 每个所属模块都应优先响应 peopleId，不能回到首页、收藏或预选演员。
-  for (const name of ["loadList", "loadFavorites", "loadFavoriteUpdates", "loadCreatorWall", "search"]) {
+  for (const name of ["loadList", "loadFavorites", "loadFavoriteUpdates", "loadCreatorWall", "loadPopularPeople", "search"]) {
     const before = calls.length;
     const works = await sandbox[name]({
       peopleId: "creator:model/target", page: 2,
@@ -140,5 +140,23 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
   sandbox.Widget.storage.set("creator-page:model/target", "first-page-cache");
   await sandbox.loadCreatorWall({ creatorPath: "/model/target", page: 2 });
   assert.equal(sandbox.Widget.storage.get("creator-page:model/target"), "first-page-cache");
+  const hubList = await sandbox.loadPopularPeople({ favoriteCreators: "/model/target\n/pornstar/alice" });
+  assert.equal(hubList.length, 1);
+  assert.equal(hubList[0].type, "url");
+  const hubDetail = await sandbox.loadDetail(hubList[0].link);
+  assert.equal(hubDetail.link, hubList[0].link);
+  assert.equal(hubDetail.peoples.length, 2);
+  assert.equal(hubDetail.peoples[0].id, "creator:model/target");
+  assert.equal(hubDetail.peoples[0].title, "Target Creator");
+  assert.equal(hubDetail.peoples[0].avatar, "https://img.example/home.jpg");
+  assert.equal(hubDetail.childItems, undefined);
+  const hubWorks = await sandbox.loadPopularPeople({ peopleId: hubDetail.peoples[0].id });
+  assert.equal(hubWorks[0].link, "video:target456");
+  const beforeBadHub = calls.length;
+  for (const link of ["ph-people:%", "ph-people:", "ph-people:" + encodeURIComponent("../bad")]) {
+    assert.equal(await sandbox.loadDetail(link), null);
+  }
+  assert.equal((await sandbox.loadPopularPeople({ page: 2 })).length, 0);
+  assert.equal(calls.length, beforeBadHub);
   console.log("✅ Forward Pornhub mock test passed", { calls: calls.length });
 })().catch(error => { console.error("❌", error); process.exit(1); });
