@@ -58,7 +58,9 @@ https://cn.pornhub.com/view_video.php?viewkey=...
 - `senplayer-pornhub.js`：HTML 响应注入与 SenPlayer 跳转脚本
 - `senplayer-pornhub-request.js`：SenPlayer MP4 CDN 请求头修正脚本
 
-## Pornhub 账号内容与 Loon 登录桥接（1.2.4）
+## Pornhub 账号内容与 Loon 登录桥接（1.2.5）
+
+`1.2.5` 小修公共解析：列表封面优先从视频链接内图片按 `data-mediumthumb / data-image / data-poster / data-src / src` 提取，排除视频、内联数据和常见占位图；清晰度兼容数组与 `720p` 文本，多档 HLS 标记为自适应最高档位；页面请求识别明确验证页、空响应与 HTTP 错误。未改账号桥接、缓存 TTL、分集或取链流程。已有关注缓存中的图片需过期或强刷后更新。离线边界和回归测试通过，客户端图片及播放效果待确认。
 
 `1.2.4` 仅为“我的关注”和“关注更新”增加 `Widget.storage` 持久化：分别缓存 6 小时和 5 分钟，按配置用户名、入口、页码隔离。随机排序读取副本后执行，不污染缓存原顺序。两个入口新增“缓存模式”，选择“每次强制刷新”绕过读取并更新缓存；恢复“优先缓存”后继续使用缓存。不新增推荐、演员分集或播放缓存。
 

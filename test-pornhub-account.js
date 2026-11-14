@@ -80,7 +80,7 @@ vm.runInContext(fs.readFileSync('forward-pornhub.js', 'utf8'), c);
     }
     assert.equal(c.accountContent('<div class="subscriptionsVideosWrapper mobile"><ul class="videoList"></ul></div>', false, '/subscriptions'), '<ul class="videoList"></ul>');
     assert.throws(() => c.accountContent('<div class="subscriptionsVideosWrapper mobile"><ul class="videoList">' + card + '</ul></div>', false, '/recommended'), /结构未识别/);
-    assert.equal(c.WidgetMetadata.version, '1.2.4');
+    assert.equal(c.WidgetMetadata.version, '1.2.5');
     const favoritesModule = c.WidgetMetadata.modules.find(module => module.id === 'loadFavorites');
     const sortParam = favoritesModule.params.find(param => param.name === 'sortOrder');
     assert.equal(sortParam.value, 'original');

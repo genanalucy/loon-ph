@@ -1,7 +1,7 @@
 WidgetMetadata = {
     id: "forward.pornhub",
     title: "Pornhub",
-    version: "1.2.4",
+    version: "1.2.5",
     requiredVersion: "0.0.1",
     description: "Pornhub 公开热门、搜索、播放、相关推荐与创作者作品",
     author: "genanalucy",
@@ -217,6 +217,23 @@ function creatorItem(path, html) {
     };
 }
 
+function videoCoverFromCard(card) {
+    // 优先视频链接内部的图片，避免误选上传者头像。
+    const links = String(card).match(/<a\b[^>]*>[\s\S]*?<\/a>/gi) || [];
+    const videoLink = links.find(tag => /view_video\.php\?viewkey=/.test(attrValue(tag, "href")) && /<img\b/i.test(tag));
+    const images = String(videoLink || card).match(/<img\b[^>]*>/gi) || [];
+    for (const name of ["data-mediumthumb", "data-image", "data-poster", "data-src", "src"]) {
+        for (const image of images) {
+            const value = attrValue(image, name);
+            if (!value || /^(?:data|javascript):/i.test(value) || /\.(?:webm|mp4|m3u8|js)(?:[?#]|$)/i.test(value)) continue;
+            if (/(?:^|[\/_-])(?:placeholder|transparent|blank)(?:[\/_.-]|$)/i.test(value)) continue;
+            const url = absoluteUrl(value);
+            if (/^https?:\/\//i.test(url)) return url;
+        }
+    }
+    return "";
+}
+
 function videoItemFromCard(card) {
     const urlMatch = card.match(/href\s*=\s*["']([^"']*view_video\.php\?viewkey=[^"']+)["']/i);
     const key = viewKeyFromUrl(urlMatch && urlMatch[1]);
@@ -231,7 +248,6 @@ function videoItemFromCard(card) {
         if (text) fallbackTitles.push(text);
     }
     const title = cleanText(titledLink && titledLink[1]) || fallbackTitles.sort((a, b) => b.length - a.length)[0] || "";
-    const imageMatch = card.match(/<(?:img)\b[^>]*(?:data-poster|src)\s*=\s*["']([^"']+)["']/i);
     const durationMatch = card.match(/class\s*=\s*["'][^"']*\b(?:time|duration)\b[^"']*["'][^>]*>([^<]*)<\/(?:span|var)>/i);
     const uploaderMatch = card.match(/<a\b[^>]*class\s*=\s*["'][^"']*uploaderLink[^"']*["'][^>]*href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i);
     const viewMatch = card.match(/class\s*=\s*["'][^"']*videoViews[^"']*["'][^>]*>[\s\S]*?<\/i>\s*([^<]+)/i);
@@ -241,7 +257,7 @@ function videoItemFromCard(card) {
         id: key,
         type: "url",
         title,
-        coverUrl: absoluteUrl(imageMatch && imageMatch[1]),
+        coverUrl: videoCoverFromCard(card),
         durationText: cleanText(durationMatch && durationMatch[1]),
         description: cleanText(viewMatch && viewMatch[1]),
         link: linkForVideo(key),
@@ -330,10 +346,22 @@ function relatedItemsFromPage(html) {
     }
 }
 
+function checkPageResponse(response) {
+    const html = response && response.data;
+    if (typeof html !== "string" || !html.trim()) throw new Error("Pornhub 网页为空或响应格式异常");
+    // 仅识别明确的挑战页特征，不能以正文含有 Cloudflare 字样判定。
+    if (/<title[^>]*>\s*(?:Just a moment|Attention Required)/i.test(html) ||
+        /(?:id=["']cf-challenge|\/cdn-cgi\/challenge-platform\/|cf-browser-verification)/i.test(html)) {
+        throw new Error("Pornhub 返回访问验证页面，请先在浏览器完成验证后重试");
+    }
+    const status = Number(response.status || response.statusCode || 0);
+    if (status >= 400) throw new Error("Pornhub 网页请求失败（HTTP " + status + "）");
+    return html;
+}
+
 async function requestPage(path, params) {
     const response = await Widget.http.get(absoluteUrl(path), { headers: phHeaders(), params: params || {} });
-    if (!response || typeof response.data !== "string") throw new Error("Pornhub 未返回可解析的网页");
-    return response.data;
+    return checkPageResponse(response);
 }
 
 function creatorPathFromPeopleId(value) {
@@ -395,8 +423,8 @@ async function requestAccountPage(path, params) {
         headers,
         params: { page: accountPageNumber(params) }
     });
-    const html = response && response.data;
-    if (typeof html !== "string" || !/\bisLoggedInUser\s*=\s*1\b/.test(html)) {
+    const html = checkPageResponse(response);
+    if (!/\bisLoggedInUser\s*=\s*1\b/.test(html)) {
         throw new Error("未取得账号登录状态：请启用 Loon Account Bridge，在 Safari 登录 cn.pornhub.com 并打开订阅页面后重试");
     }
     if (/您无权限查看此内容|you (?:do not|don't) have permission/i.test(html)) {
@@ -733,6 +761,15 @@ async function resolveRemoteDefinitions(definitions) {
     }
 }
 
+function resourceQuality(item) {
+    const value = item.height || item.quality || 0;
+    const values = Array.isArray(value) ? value : [value];
+    return values.reduce((best, entry) => {
+        const quality = parseInt(entry, 10);
+        return Number.isFinite(quality) && quality > best ? quality : best;
+    }, 0);
+}
+
 async function loadResource(params = {}) {
     const link = String(params.link || "");
     const key = link.indexOf("video:") === 0 ? link.slice("video:".length) : "";
@@ -745,14 +782,15 @@ async function loadResource(params = {}) {
     const seen = {};
     const resources = definitions.filter(item => item && /^https?:\/\//i.test(item.videoUrl || ""))
         .sort((a, b) => {
-            const quality = Number(b.height || b.quality || 0) - Number(a.height || a.quality || 0);
+            const quality = resourceQuality(b) - resourceQuality(a);
             if (quality) return quality;
             return String(a.format || "").toLowerCase() === "mp4" ? -1 : 1;
         })
         .map(item => {
             const format = String(item.format || "hls").toUpperCase();
-            const quality = Number(item.height || item.quality || 0);
-            const name = format + (quality ? " · " + quality + "P" : " · 自动");
+            const quality = resourceQuality(item);
+            const adaptive = format === "HLS" && Array.isArray(item.quality) && item.quality.length > 1;
+            const name = format + (adaptive ? " · 自适应（最高 " + quality + "P）" : quality ? " · " + quality + "P" : " · 自动");
             if (seen[item.videoUrl]) return null;
             seen[item.videoUrl] = true;
             return {

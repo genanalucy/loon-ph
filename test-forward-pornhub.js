@@ -46,7 +46,7 @@ const sandbox = {
             homeCard.replace(/abc123/g, "seasonVideo" + (start + index + 1))).join("") };
         }
         if (url.endsWith("/model/target")) {
-          return { data: Number(options.params.page || 1) > 2 ? "" :
+          return { data: Number(options.params.page || 1) > 2 ? "<html><body>No more videos</body></html>" :
             '<h1>Target Creator</h1>' + homeCard.replace(/abc123/g, "target456") };
         }
         if (url.endsWith("/pornstar/alice")) return { data: homeCard };
@@ -107,7 +107,7 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
   assert.equal(favorites[0].link, "creator:pornstar/alice");
   assert.equal(favorites[1].link, "creator:model/bob");
 
-  assert.equal(sandbox.WidgetMetadata.version, "1.2.4");
+  assert.equal(sandbox.WidgetMetadata.version, "1.2.5");
   const creatorWallModule = sandbox.WidgetMetadata.modules.find(module => module.id === "loadCreatorWall");
   assert.equal(sandbox.WidgetMetadata.modules.length, 8);
   assert.equal(creatorWallModule.cacheDuration, 0);
@@ -216,5 +216,26 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
   }
   assert.equal((await sandbox.loadPopularPeople({ page: 2 })).length, 0);
   assert.equal(calls.length, beforeBadHub);
+  const coverCard = '<img src="https://img.test/avatar.jpg"><a href="/view_video.php?viewkey=pic1"><img src="/placeholder.jpg" data-src="/fallback.jpg" data-image="//img.test/large.jpg"></a>';
+  assert.equal(sandbox.videoCoverFromCard(coverCard), 'https://img.test/large.jpg');
+  assert.equal(sandbox.videoCoverFromCard('<img data-image="/preview.webm" data-src="/valid.jpg" src="data:image/png;base64,x">'), 'https://www.pornhub.com/valid.jpg');
+  assert.equal(sandbox.videoCoverFromCard('<img src="/blank.gif">'), '');
+  assert.equal(sandbox.resourceQuality({ quality: [240, '720', 1080] }), 1080);
+  assert.equal(sandbox.resourceQuality({ quality: '720p' }), 720);
+  assert.equal(sandbox.resourceQuality({ quality: ['bad', null] }), 0);
+  const originalGet = sandbox.Widget.http.get;
+  sandbox.Widget.http.get = async (url, options) => url.endsWith('/view_video.php')
+    ? { data: detail.replace('"quality":"720","height":720', '"quality":[240,720,2160]') }
+    : originalGet(url, options);
+  const adaptiveResources = await sandbox.loadResource({ link: 'video:abc123' });
+  assert.equal(adaptiveResources[0].url, 'https://media.example/720.m3u8');
+  assert.equal(adaptiveResources[0].name, 'HLS · 自适应（最高 2160P）');
+  sandbox.Widget.http.get = originalGet;
+  for (const data of ['<title>Just a moment...</title>', '<script src="/cdn-cgi/challenge-platform/test"></script>']) {
+    assert.throws(() => sandbox.checkPageResponse({ data }), /访问验证/);
+  }
+  assert.throws(() => sandbox.checkPageResponse({ data: ' ', status: 200 }), /为空/);
+  assert.throws(() => sandbox.checkPageResponse({ data: '<html>Unavailable</html>', status: 503 }), /HTTP 503/);
+  assert.equal(sandbox.checkPageResponse({ data: '<p>Cloudflare discussion</p>' }), '<p>Cloudflare discussion</p>');
   console.log("✅ Forward Pornhub mock test passed", { calls: calls.length });
 })().catch(error => { console.error("❌", error); process.exit(1); });
