@@ -102,14 +102,14 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
   assert.equal(cachedCreatorDetail.episodeItems[0].link, "video:abc123");
   assert.equal(calls.length, callsBeforeCachedDetail + 1);
 
-  const favorites = await sandbox.loadFavorites({ favoriteCreators: "https://www.pornhub.com/pornstar/alice\n/model/bob\ninvalid" });
+  const favorites = await sandbox.loadManualFavorites({ favoriteCreators: "https://www.pornhub.com/pornstar/alice\n/model/bob\ninvalid" });
   assert.equal(favorites.length, 2);
   assert.equal(favorites[0].link, "creator:pornstar/alice");
   assert.equal(favorites[1].link, "creator:model/bob");
 
-  assert.equal(sandbox.WidgetMetadata.version, "1.1.7");
+  assert.equal(sandbox.WidgetMetadata.version, "1.2.0");
   const creatorWallModule = sandbox.WidgetMetadata.modules.find(module => module.id === "loadCreatorWall");
-  assert.equal(sandbox.WidgetMetadata.modules.length, 6);
+  assert.equal(sandbox.WidgetMetadata.modules.length, 8);
   assert.equal(creatorWallModule.cacheDuration, 0);
   assert.equal(creatorWallModule.params[0].type, "enumeration");
   assert.equal(creatorWallModule.params[0].enumOptions.length, 12);
@@ -121,7 +121,7 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
   assert.equal(creatorWall[0].link, "video:abc123");
   assert.equal(creatorWall[0].peoples[0].id, "creator:pornstar/alice");
 
-  const updates = await sandbox.loadFavoriteUpdates({ favoriteCreators: "/pornstar/alice\n/model/bob" });
+  const updates = await sandbox.loadManualFavoriteUpdates({ favoriteCreators: "/pornstar/alice\n/model/bob" });
   assert.equal(updates.length, 1);
   assert.equal(updates[0].peoples[0].id, "creator:pornstar/alice");
   assert.ok(calls.some(call => call.url.endsWith("/pornstar/alice")));
@@ -155,8 +155,8 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
       .params.some(param => param.name === "page" && param.type === "page"));
   }
   const beforeExhausted = calls.length;
-  assert.equal((await sandbox.loadFavorites({ page: 2 })).length, 0);
-  assert.equal((await sandbox.loadFavoriteUpdates({ page: 2 })).length, 0);
+  assert.equal((await sandbox.loadManualFavorites({ page: 2 })).length, 0);
+  assert.equal((await sandbox.loadManualFavoriteUpdates({ page: 2 })).length, 0);
   assert.equal(calls.length, beforeExhausted, "普通收藏列表不能重复加载第一页");
   sandbox.Widget.storage.set("creator-page:model/target", "first-page-cache");
   await sandbox.loadCreatorWall({ creatorPath: "/model/target", page: 2 });

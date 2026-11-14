@@ -58,6 +58,31 @@ https://cn.pornhub.com/view_video.php?viewkey=...
 - `senplayer-pornhub.js`：HTML 响应注入与 SenPlayer 跳转脚本
 - `senplayer-pornhub-request.js`：SenPlayer MP4 CDN 请求头修正脚本
 
+## Pornhub 账号内容与 Loon 登录桥接（1.2.0，待真机验证）
+
+安装 Loon 插件：
+
+```text
+https://raw.githubusercontent.com/genanalucy/loon-ph/main/pornhub-account-auth.plugin
+```
+
+开启 MITM 并信任 Loon CA 后，在 Safari 登录 `https://cn.pornhub.com`，再打开一次 `https://cn.pornhub.com/recommended` 或 `https://cn.pornhub.com/subscriptions`。插件只在指定账号页面的浏览器导航响应明确包含 `isLoggedInUser = 1` 时保存该请求的 Cookie。捕获包含当前请求所用凭据，不解析 Set-Cookie 或保证续期；网站更新 Cookie 后需再次访问指定页面才会捕获新值。
+
+更新主 Widget `forward-pornhub.js` 到 1.2.0，填写全局参数“Pornhub 用户名”。新增/调整入口：
+
+- 我的关注：读取 `/users/<用户名>/subscriptions`，替代固定演员列表，点击沿用最多 50 集作品集。
+- 关注更新：读取 `/subscriptions` 视频列表。
+- 个性化推荐：读取 `/recommended` 视频列表。
+- 手动收藏（备用）：保留原先手工配置的人物，不依赖登录。
+
+Widget 账号请求携带 `X-PH-Widget-Auth` 标记，Loon 为 `https://cn.pornhub.com` 的上述三个路径注入本地 Cookie 并删除标记。Widget 自身不保存凭据，不向视频/图片 CDN 注入 Cookie。登录检测失败时提示重新在 Safari 登录并访问账号页面，不返回游客内容。账号入口的客户端模块缓存设为 0。
+
+**限制与安全**：Widget 网络必须经过 Loon，且允许 HTTPS 解密。Loon 的请求头数组/重复 Cookie 表示及浏览器 `Sec-Fetch-Dest` 特征需真机确认；首次安装可能需要关闭重开账号网页。脚本不输出 Cookie，不存入 Git，也不提供远程凭据服务。Loon 本地持久化存储不是安全钥匙串；备份/导出 Loon 数据前注意其中凭据。停用插件不会删除已保存 Cookie，需要清除 Loon 中 `ph.account.cookie.v1` 对应数据或撤销网站会话。网站真正撤销登录时仍需重新登录。
+
+**验证状态**：来源限制、游客拒绝、标记去除、Cookie 合并、失败不覆盖、三个入口的 mock 已通过。公开网页已确认订阅人物需要权限，更新和推荐存在独立列表容器。登录后的订阅人物具体 HTML、Loon → Widget 注入链路、账号身份及客户端显示尚未实测；当前人物解析是兼容候选结构，不宣称三项账号功能已经可用。若提示“结构未识别”，需要登录后相应页面抓包（勿公开上传凭据）继续适配。
+
+测试：`node test-pornhub-account.js`。
+
 ## 独立演员头像 Widget（实验）
 
 导入 `https://raw.githubusercontent.com/genanalucy/loon-ph/main/forward-pornhub-actors.js`，在首页添加其“演员头像墙”，使用普通海报墙布局，而非内置热门人物组件。全局参数“演员主页”每行填一个 Pornhub 主页 URL。每位演员独立卡片，封面为主页头像，`link` 为对应主页 URL。

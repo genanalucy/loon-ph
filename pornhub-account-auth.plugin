@@ -1,0 +1,11 @@
+#!name=Pornhub Account Bridge
+#!desc=Safari 登录后访问账号页面捕获 Cookie，仅向带标记的 cn.pornhub.com 指定账号请求注入；凭据仅存 Loon 本地
+#!author=genanalucy
+#!system=iOS,iPadOS
+
+[Script]
+http-request ^https:\/\/cn\.pornhub\.com\/(?:subscriptions|recommended|users\/[A-Za-z0-9_-]+\/subscriptions)(?:\?|$) script-path=https://raw.githubusercontent.com/genanalucy/loon-ph/main/pornhub-account-auth.js, timeout=10, tag=PH Account Inject, enable=true
+http-response ^https:\/\/cn\.pornhub\.com\/(?:subscriptions|recommended|users\/[A-Za-z0-9_-]+\/subscriptions)(?:\?|$) script-path=https://raw.githubusercontent.com/genanalucy/loon-ph/main/pornhub-account-auth.js, requires-body=true, timeout=10, tag=PH Account Capture, enable=true
+
+[MITM]
+hostname = %APPEND% cn.pornhub.com

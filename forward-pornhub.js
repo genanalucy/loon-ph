@@ -1,13 +1,15 @@
 WidgetMetadata = {
     id: "forward.pornhub",
     title: "Pornhub",
-    version: "1.1.7",
+    version: "1.2.0",
     requiredVersion: "0.0.1",
     description: "Pornhub 公开热门、搜索、播放、相关推荐与创作者作品",
     author: "genanalucy",
     site: "https://www.pornhub.com/",
     detailCacheDuration: 0,
     globalParams: [
+        { name: "accountUsername", title: "Pornhub 用户名", type: "input", value: "genanalucy",
+          description: "账号内容通过 Loon Account Bridge 注入登录状态，无需填写 Cookie" },
         {
             name: "favoriteCreators",
             title: "收藏创作者",
@@ -26,10 +28,18 @@ WidgetMetadata = {
         },
         {
             id: "loadFavorites",
-            title: "收藏演员",
+            title: "我的关注",
             functionName: "loadFavorites",
-            cacheDuration: 300,
+            cacheDuration: 0,
             params: [{ name: "page", title: "页码", type: "page" }]
+        },
+        {
+            id: "loadRecommended", title: "个性化推荐", functionName: "loadRecommended",
+            cacheDuration: 0, params: [{ name: "page", title: "页码", type: "page" }]
+        },
+        {
+            id: "loadManualFavorites", title: "手动收藏（备用）", functionName: "loadManualFavorites",
+            cacheDuration: 300, params: [{ name: "page", title: "页码", type: "page" }]
         },
         {
             id: "loadPopularPeople",
@@ -40,9 +50,9 @@ WidgetMetadata = {
         },
         {
             id: "loadFavoriteUpdates",
-            title: "收藏更新",
+            title: "关注更新",
             functionName: "loadFavoriteUpdates",
-            cacheDuration: 300,
+            cacheDuration: 0,
             params: [{ name: "page", title: "页码", type: "page" }]
         },
         {
@@ -357,7 +367,87 @@ async function loadList(params = {}) {
     return items;
 }
 
+function accountPageNumber(params) {
+    const page = Number(params.page || 1);
+    return Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
+}
+
+async function requestAccountPage(path, params) {
+    const response = await Widget.http.get("https://cn.pornhub.com" + path, {
+        headers: Object.assign(phHeaders(), { Referer: "https://cn.pornhub.com/", "X-PH-Widget-Auth": "1" }),
+        params: { page: accountPageNumber(params) }
+    });
+    const html = response && response.data;
+    if (typeof html !== "string" || !/\bisLoggedInUser\s*=\s*1\b/.test(html)) {
+        throw new Error("未取得账号登录状态：请启用 Loon Account Bridge，在 Safari 登录 cn.pornhub.com 并打开订阅页面后重试");
+    }
+    if (/您无权限查看此内容|you (?:do not|don't) have permission/i.test(html)) {
+        throw new Error("账号无权查看此内容，请检查用户名与 Safari 登录账号是否一致");
+    }
+    return html;
+}
+
+function accountContent(html, actors) {
+    if (actors) {
+        const start = html.search(/<div\b[^>]*class=["'][^"']*\bprofileContentLeft\b/i);
+        if (start < 0) throw new Error("订阅人物结构未识别；需要登录后的页面样本，未回退到固定演员");
+        const right = html.indexOf('profileContentRight', start);
+        return html.slice(start, right < 0 ? html.length : right);
+    }
+    const start = /<ul\b[^>]*\bid=["'](?:subscriptionsVideosSection|recommendedListings|recommendedVideos|recommendedVideoSection|videoCategory)["'][^>]*>/i.exec(html);
+    if (start) {
+        const end = html.indexOf("</ul>", start.index + start[0].length);
+        return html.slice(start.index, end < 0 ? html.length : end);
+    }
+    // Remove header/navigation so their unrelated videos can never masquerade as account results.
+    const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i);
+    if (main) return main[1];
+    throw new Error("账号视频列表结构未识别，需要登录后的页面样本；未使用导航推荐代替");
+}
+
 async function loadFavorites(params = {}) {
+    if (params.peopleId != null) return routeCreatorWorks(params);
+    const username = String(params.accountUsername || "genanalucy").trim();
+    if (!/^[A-Za-z0-9_-]+$/.test(username)) throw new Error("用户名格式无效");
+    const html = accountContent(await requestAccountPage("/users/" + username + "/subscriptions", params), true);
+    const anchors = html.match(/<a\b[^>]*>[\s\S]*?<\/a>/gi) || [];
+    const seen = {};
+    const items = [];
+    for (const anchor of anchors) {
+        const href = attrValue(anchor, "href");
+        // Strict host/path allowlist; do not strip arbitrary external hosts.
+        const match = href.match(/^(?:https:\/\/(?:www|cn)\.pornhub\.com)?\/?((?:model|pornstar|channels|users)\/[A-Za-z0-9_-]+)\/?$/i);
+        if (!match || seen[match[1].toLowerCase()] || match[1].toLowerCase() === "users/" + username.toLowerCase()) continue;
+        seen[match[1].toLowerCase()] = true;
+        const image = (anchor.match(/<img\b[^>]*>/i) || [""])[0];
+        const title = cleanText(anchor.replace(/<img\b[^>]*>/gi, "")) || attrValue(image, "alt") || creatorTitleFromPath(match[1]);
+        const item = creatorItem(match[1], "");
+        item.title = title;
+        item.coverUrl = absoluteUrl(attrValue(image, "data-src") || attrValue(image, "src"));
+        item.posterPath = item.coverUrl;
+        item.backdropPath = item.coverUrl;
+        items.push(item);
+    }
+    if (!items.length && accountPageNumber(params) === 1) throw new Error("未解析到订阅人物；请确认账号有关注，或提供登录后的人物页面抓包");
+    return items;
+}
+
+async function loadAccountVideos(params, path) {
+    if (params.peopleId != null) return routeCreatorWorks(params);
+    const items = parseVideoCards(accountContent(await requestAccountPage(path, params), false));
+    if (!items.length && accountPageNumber(params) === 1) throw new Error("账号视频列表为空或结构尚未适配；未使用游客视频代替");
+    return items;
+}
+
+async function loadFavoriteUpdates(params = {}) {
+    return loadAccountVideos(params, "/subscriptions");
+}
+
+async function loadRecommended(params = {}) {
+    return loadAccountVideos(params, "/recommended");
+}
+
+async function loadManualFavorites(params = {}) {
     if (params.peopleId != null) return routeCreatorWorks(params);
     if (Number(params.page || 1) > 1) return [];
     const paths = favoriteCreatorPaths(params.favoriteCreators);
@@ -396,7 +486,7 @@ async function loadPopularPeople(params = {}) {
     if (params.peopleId != null) return routeCreatorWorks(params);
     if (Number(params.page || 1) > 1) return [];
     // 复用收藏加载以获取姓名和头像，并将首页写入现有缓存。
-    await loadFavorites(params);
+    await loadManualFavorites(params);
     return [peopleHubItem(favoriteCreatorPaths(params.favoriteCreators))];
 }
 
@@ -409,7 +499,7 @@ async function loadCreatorWall(params = {}) {
     return loadCreatorWorks(path, params);
 }
 
-async function loadFavoriteUpdates(params = {}) {
+async function loadManualFavoriteUpdates(params = {}) {
     if (params.peopleId != null) return routeCreatorWorks(params);
     if (Number(params.page || 1) > 1) return [];
     const paths = favoriteCreatorPaths(params.favoriteCreators);
