@@ -58,7 +58,11 @@ https://cn.pornhub.com/view_video.php?viewkey=...
 - `senplayer-pornhub.js`：HTML 响应注入与 SenPlayer 跳转脚本
 - `senplayer-pornhub-request.js`：SenPlayer MP4 CDN 请求头修正脚本
 
-## Pornhub 账号内容与 Loon 登录桥接（1.2.8）
+## Pornhub 账号内容与 Loon 登录桥接（1.2.9）
+
+`1.2.9` 撤回视频人物入口的中间作品集卡片，点击人物直接显示普通影片列表并支持 page 翻页。model/pornstar 使用 `/videos` 作品地址、桌面 UA 和 `o=mr`，channels/users 保留主页分页。复用作品容器解析以排除导航推荐。九个入口第 1/2 页不同视频和末页空列表、非法 ID 已通过 mock；实际 model 桌面作品第 2 页取得 18 个目标条目。但网站请求存在偶发异常，真实第 1/2 页连续翻页和 channels/users 各类型仍待客户端验证，不保证站点不会跨页重复。
+
+“我的关注”点击演员仍保留原剧集模式及 1.2.8 切集修复，本次不修改其最多 50 集聚合流程，因此之前只显示 20 集的问题未在该入口解决。账号桥接、缓存与播放头不变。
 
 `1.2.8` 补充分集切换身份兼容：新分集 `id` 与 `link` 均使用 `video:<key>`；资源模块支持只有该命名空间 ID 的调用，以及 `creator:` 父级身份加单季集号的调用。生成演员详情时在模块内存和 `Widget.storage` 保存本次集序到视频 ID 的映射，不保存播放 URL。不重新抓网页猜测集序，缺失映射、越界、非法来源均返回空；有效 link 优先于 id。需要重新打开演员详情生成映射，旧播放器队列建议退出重开。
 

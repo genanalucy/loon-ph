@@ -1,7 +1,7 @@
 WidgetMetadata = {
     id: "forward.pornhub",
     title: "Pornhub",
-    version: "1.2.8",
+    version: "1.2.9",
     requiredVersion: "0.0.1",
     description: "Pornhub 公开热门、搜索、播放、相关推荐与创作者作品",
     author: "genanalucy",
@@ -383,11 +383,9 @@ function creatorPathFromPeopleId(value) {
 async function loadCreatorWorks(path, params = {}) {
     const pageValue = Number(params.page || 1);
     const page = Number.isFinite(pageValue) ? Math.max(1, Math.floor(pageValue)) : 1;
-    const html = await requestPage("/" + path, page > 1 ? { page } : {});
-    // 仅缓存首页，避免翻页覆盖演员详情的作品预览。
-    if (page === 1) writeCreatorCache(path, html);
+    const html = await requestCreatorVideoPage(path, page);
     const creator = creatorItem(path, html);
-    const works = parseVideoCards(html).map(item => {
+    const works = creatorPageVideos(html).map(item => {
         item.peoples = [{ id: linkForCreator(path), title: creator.title, role: "创作者" }];
         return item;
     });
@@ -406,14 +404,8 @@ async function loadCreatorWorks(path, params = {}) {
 async function routeCreatorWorks(params) {
     const path = creatorPathFromPeopleId(params.peopleId);
     // 非法 peopleId 不能退回首页或预选演员，否则会显示错误作品。
-    if (!path || accountPageNumber(params) > 1) return [];
-    let html = readCreatorCache(path);
-    if (!html) {
-        html = await requestPage("/" + path, {});
-        writeCreatorCache(path, html);
-    }
-    // 人物路由返回列表，不能直接跳详情；用同一个 creator: 卡片统一进入分集。
-    return [creatorItem(path, html)];
+    if (!path) return [];
+    return loadCreatorWorks(path, params);
 }
 
 async function loadList(params = {}) {
@@ -662,6 +654,18 @@ async function search(params = {}) {
     if (!keyword) throw new Error("请输入关键词");
     const html = await requestPage("/video/search", { search: keyword, page: Math.max(1, Number(params.page || 1)) });
     return parseVideoCards(html);
+}
+
+async function requestCreatorVideoPage(path, page) {
+    // model 主页的 page 参数可能仍返回简介/预览；完整作品有独立 videos 入口。
+    const videoPath = /^(?:model|pornstar)\//i.test(path) ? path + "/videos" : path;
+    const response = await Widget.http.get(PH_ORIGIN + "/" + videoPath, {
+        headers: Object.assign(phHeaders(), {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+        }),
+        params: { page, o: "mr" }
+    });
+    return checkPageResponse(response);
 }
 
 function creatorPageVideos(html) {

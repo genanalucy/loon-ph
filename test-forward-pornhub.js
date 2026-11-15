@@ -45,6 +45,11 @@ const sandbox = {
           return { data: Array.from({ length: Math.max(0, Math.min(20, 45 - start)) }, (_, index) =>
             homeCard.replace(/abc123/g, "seasonVideo" + (start + index + 1))).join("") };
         }
+        if (url.endsWith("/model/target/videos")) {
+          const page = Number(options.params.page || 1);
+          return { data: page > 2 ? '<html>No more videos</html>' : '<h1>Target Creator</h1><ul id="mostRecentVideosSection">' +
+            homeCard.replace(/abc123/g, page === 1 ? 'target456' : 'targetPage2') + '</ul>' };
+        }
         if (url.endsWith("/model/target")) {
           return { data: Number(options.params.page || 1) > 2 ? "<html><body>No more videos</body></html>" :
             '<h1>Target Creator</h1>' + homeCard.replace(/abc123/g, "target456") };
@@ -80,8 +85,7 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
   assert.ok(resources.some(resource => resource.url === "https://media.example/1080.m3u8"));
 
   const creatorWorks = await sandbox.loadList({ peopleId: "creator:pornstar/alice" });
-  assert.equal(creatorWorks[0].link, "creator:pornstar/alice");
-  assert.equal(creatorWorks[0].mediaType, "tv");
+  assert.equal(creatorWorks[0].link, "video:abc123");
 
   const creatorDetail = await sandbox.loadDetail("creator:pornstar/alice");
   assert.equal(creatorDetail.link, "creator:pornstar/alice");
@@ -108,7 +112,7 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
   assert.equal(favorites[0].link, "creator:pornstar/alice");
   assert.equal(favorites[1].link, "creator:model/bob");
 
-  assert.equal(sandbox.WidgetMetadata.version, "1.2.8");
+  assert.equal(sandbox.WidgetMetadata.version, "1.2.9");
   const creatorWallModule = sandbox.WidgetMetadata.modules.find(module => module.id === "loadCreatorWall");
   assert.equal(sandbox.WidgetMetadata.modules.length, 8);
   assert.equal(creatorWallModule.cacheDuration, 0);
@@ -134,20 +138,15 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
       peopleId: "creator:model/target", page: 1,
       creatorPath: "/pornstar/alice", favoriteCreators: "/model/bob", keyword: "unrelated"
     });
-    assert.ok(calls.length - before <= 1, name + " 至多请求演员首页");
-    if (calls.length > before) {
-      assert.equal(calls[before].url, "https://www.pornhub.com/model/target");
-      assert.equal(calls[before].options.params.page, undefined);
-    }
+    assert.equal(calls.length, before + 1, name + " 只请求目标作品页");
+    assert.equal(calls[before].url, "https://www.pornhub.com/model/target/videos");
+    assert.equal(calls[before].options.params.page, 1);
+    assert.equal(calls[before].options.params.o, 'mr');
     assert.equal(works.length, 1);
-    assert.equal(works[0].link, "creator:model/target");
-    assert.equal(works[0].mediaType, "tv");
-    assert.equal(works[0].title, "Target Creator");
-    const detail = await sandbox.loadDetail(works[0].link);
-    assert.equal(detail.episodeItems[0].link, "video:target456");
-    const beforePage2 = calls.length;
-    assert.equal((await sandbox[name]({ peopleId: "creator:model/target", page: 2 })).length, 0);
-    assert.equal(calls.length, beforePage2, "人物作品集入口不能重复翻页");
+    assert.equal(works[0].link, "video:target456");
+    const nextPage = await sandbox[name]({ peopleId: "creator:model/target", page: 2 });
+    assert.equal(nextPage[0].link, 'video:targetPage2');
+    assert.equal(calls[calls.length - 1].options.params.page, 2);
     for (const peopleId of ["", "creator:../admin", "creator:model/target?x=1",
       "creator:https://evil.test/model/target", "other:model/target"]) {
       const count = calls.length;
@@ -157,7 +156,7 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
     assert.equal((await sandbox[name]({ peopleId: "creator:model/target", page: 3 })).length, 0);
   }
   const wallPage = await sandbox.loadCreatorWall({ creatorPath: "/model/target", page: 2 });
-  assert.equal(wallPage[0].link, "video:target456");
+  assert.equal(wallPage[0].link, "video:targetPage2");
   assert.equal(calls[calls.length - 1].options.params.page, 2);
   for (const id of ["loadList", "loadFavorites", "loadFavoriteUpdates", "loadCreatorWall"]) {
     assert.ok(sandbox.WidgetMetadata.modules.find(module => module.id === id)
@@ -181,7 +180,7 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
   assert.equal(hubDetail.peoples[0].avatar, "https://img.example/avatar.jpg");
   assert.equal(hubDetail.childItems, undefined);
   const hubWorks = await sandbox.loadPopularPeople({ peopleId: hubDetail.peoples[0].id });
-  assert.equal(hubWorks[0].link, "creator:model/target");
+  assert.equal(hubWorks[0].link, "video:target456");
   sandbox.Widget.storage.set("creator-page:model/series", homeCard + homeCard.replace(/abc123/g, "episode2"));
   const series = await sandbox.loadDetail("ph-season:1:model/series");
   assert.equal(series.episodeItems.length, 2);
