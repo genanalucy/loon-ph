@@ -1,7 +1,7 @@
 WidgetMetadata = {
     id: "forward.pornhub",
     title: "Pornhub",
-    version: "1.2.7",
+    version: "1.2.8",
     requiredVersion: "0.0.1",
     description: "Pornhub 公开热门、搜索、播放、相关推荐与创作者作品",
     author: "genanalucy",
@@ -704,9 +704,11 @@ async function creatorEpisodesDetail(path) {
         if (!added) break;
     }
     if (!videos.length) throw new Error("未找到该演员的公开影片；请刷新或检查主页");
+    saveCreatorEpisodes(path, videos.map(video => video.id));
     return Object.assign(creator, {
         description: "演员作品集 · 单季 " + videos.length + " 集（最多 50 集）",
         episodeItems: videos.map((video, index) => Object.assign({}, video, {
+            id: linkForVideo(video.id),
             mediaType: "tv", season: 1, episode: index + 1, playerType: "app",
             peoples: [{ id: linkForCreator(path), title: creator.title, avatar: creator.coverUrl, role: "创作者" }]
         }))
@@ -788,10 +790,45 @@ function resourceQuality(item) {
     }, 0);
 }
 
+const creatorEpisodeMaps = {};
+
+function saveCreatorEpisodes(path, keys) {
+    creatorEpisodeMaps[path] = keys.slice();
+    if (Widget.storage && typeof Widget.storage.set === "function") {
+        try { Widget.storage.set("ph-episode-map:v1:" + path, JSON.stringify(keys)); }
+        catch (_) { console.warn("[Pornhub] 分集身份映射写入失败"); }
+    }
+}
+
+function readCreatorEpisodes(path) {
+    if (creatorEpisodeMaps[path]) return creatorEpisodeMaps[path];
+    if (Widget.storage && typeof Widget.storage.get === "function") {
+        try {
+            const raw = Widget.storage.get("ph-episode-map:v1:" + path);
+            const keys = typeof raw === "string" ? JSON.parse(raw) : raw;
+            if (Array.isArray(keys) && keys.length <= 50 && keys.every(key => typeof key === "string" && /^[A-Za-z0-9]+$/.test(key))) return keys;
+        } catch (_) { /* 无映射时不重新抓网页猜测顺序。 */ }
+    }
+    return [];
+}
+
+function resourceVideoKey(params) {
+    // 明确 link 优先，非法 link 不能依赖其他 id 兜底通过。
+    const raw = params.link != null && params.link !== "" ? params.link : params.id;
+    const value = String(raw || "");
+    const video = /^video:([A-Za-z0-9]+)$/.exec(value);
+    if (video) return video[1];
+    const path = creatorPathFromPeopleId(value);
+    if (!path) return "";
+    const episode = Number(params.episode);
+    const season = params.season == null || params.season === "" ? 1 : Number(params.season);
+    if (season !== 1 || !Number.isInteger(episode) || episode < 1 || episode > 50) return "";
+    return readCreatorEpisodes(path)[episode - 1] || "";
+}
+
 async function loadResource(params = {}) {
-    const link = String(params.link || "");
-    const key = link.indexOf("video:") === 0 ? link.slice("video:".length) : "";
-    if (!/^[A-Za-z0-9]+$/.test(key)) throw new Error("缺少有效的视频标识");
+    const key = resourceVideoKey(params);
+    if (!key) return [];
     const html = await requestPage("/view_video.php", { viewkey: key });
     const flashvars = extractFlashvars(html);
     const pageDefinitions = flashvars && Array.isArray(flashvars.mediaDefinitions) ? flashvars.mediaDefinitions : [];

@@ -108,7 +108,7 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
   assert.equal(favorites[0].link, "creator:pornstar/alice");
   assert.equal(favorites[1].link, "creator:model/bob");
 
-  assert.equal(sandbox.WidgetMetadata.version, "1.2.7");
+  assert.equal(sandbox.WidgetMetadata.version, "1.2.8");
   const creatorWallModule = sandbox.WidgetMetadata.modules.find(module => module.id === "loadCreatorWall");
   assert.equal(sandbox.WidgetMetadata.modules.length, 8);
   assert.equal(creatorWallModule.cacheDuration, 0);
@@ -257,5 +257,26 @@ vm.runInContext(fs.readFileSync("./forward-pornhub.js", "utf8"), sandbox);
   assert.equal(firstSeason.episodeItems[0].headers.Referer, 'https://www.pornhub.com/');
   assert.equal(detailItem.relatedItems[0].headers.Cookie, undefined);
   assert.equal(detailItem.headers.Cookie, undefined);
+  assert.equal(series.episodeItems[1].id, 'video:episode2');
+  const switchStart = calls.length;
+  await sandbox.loadResource({ id: series.episodeItems[1].id });
+  assert.equal(calls[switchStart].options.params.viewkey, 'episode2');
+  const parentStart = calls.length;
+  await sandbox.loadResource({ link: 'creator:model/series', season: 1, episode: 2 });
+  assert.equal(calls[parentStart].options.params.viewkey, 'episode2');
+  const restarted = { console, Widget: sandbox.Widget };
+  vm.createContext(restarted);
+  vm.runInContext(fs.readFileSync('./forward-pornhub.js', 'utf8'), restarted);
+  const restartStart = calls.length;
+  await restarted.loadResource({ id: 'creator:model/series', episode: 2 });
+  assert.equal(calls[restartStart].options.params.viewkey, 'episode2');
+  for (const params of [{id:550}, {id:'episode2'}, {link:'other:episode2',id:'video:episode2'},
+    {link:'creator:model/series',episode:0}, {link:'creator:model/series',episode:51},
+    {link:'creator:model/series',episode:1.5}, {link:'creator:model/series',season:2,episode:1},
+    {link:'creator:model/missing',episode:1}, {link:'creator:model/series',episode:3}]) {
+    const count = calls.length;
+    assert.equal((await sandbox.loadResource(params)).length, 0);
+    assert.equal(calls.length, count, '无效分集不能请求或猜测影片');
+  }
   console.log("✅ Forward Pornhub mock test passed", { calls: calls.length });
 })().catch(error => { console.error("❌", error); process.exit(1); });
