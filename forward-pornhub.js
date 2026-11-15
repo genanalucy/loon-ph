@@ -1,7 +1,7 @@
 WidgetMetadata = {
     id: "forward.pornhub",
     title: "Pornhub",
-    version: "1.2.6",
+    version: "1.2.7",
     requiredVersion: "0.0.1",
     description: "Pornhub 公开热门、搜索、播放、相关推荐与创作者作品",
     author: "genanalucy",
@@ -406,8 +406,14 @@ async function loadCreatorWorks(path, params = {}) {
 async function routeCreatorWorks(params) {
     const path = creatorPathFromPeopleId(params.peopleId);
     // 非法 peopleId 不能退回首页或预选演员，否则会显示错误作品。
-    if (!path) return [];
-    return loadCreatorWorks(path, params);
+    if (!path || accountPageNumber(params) > 1) return [];
+    let html = readCreatorCache(path);
+    if (!html) {
+        html = await requestPage("/" + path, {});
+        writeCreatorCache(path, html);
+    }
+    // 人物路由返回列表，不能直接跳详情；用同一个 creator: 卡片统一进入分集。
+    return [creatorItem(path, html)];
 }
 
 async function loadList(params = {}) {
